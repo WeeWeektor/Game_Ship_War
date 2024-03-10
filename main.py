@@ -15,6 +15,7 @@ Label(root, text=about_ship, font=("Times New Roman", 14)).place(x=0, y=400)
 Label(root, text="Ваше полотно", font=("Times New Roman", 14)).place(x=110, y=0)
 Label(root, text="Полотно суперника", font=("Times New Roman", 14)).place(x=1070, y=0)
 
+test = 1
 ship = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]
 i = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
 j = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
