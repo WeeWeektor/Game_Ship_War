@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import messagebox
+from email_validator import validate_email, EmailNotValidError
 import webbrowser
 import random
 
@@ -23,6 +24,7 @@ i = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
 j = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
 x, y, yi, xj = 0, 0, 0, 0
 
+window_registration = None
 list_with_line = []
 
 ship_var_pole = Canvas(root, width=300, height=300, bg="blue")
@@ -542,11 +544,113 @@ def get_color_zalupa():
     root.configure(bg="red")
 
 
+def window_for_registration(event=None):
+    window_registration.title("Реєстрація")
+    window_registration.geometry("300x340")
+
+    get_post_login_entry.destroy()
+    get_password_login_label.destroy()
+    get_post_login_label.destroy()
+    get_password_login_entry.destroy()
+    login_button.destroy()
+    registration_button.destroy()
+
+    button_beck = Button(window_registration, text="Відмінити", width=10, bg="black", fg="white",
+                         font=("Times New Roman", 12))
+    button_beck.place(x=0, y=0)
+    button_beck.bind("<Button-1>", window_for_login)
+
+    Label(window_registration, text="Введіть email:", font=("Times New Roman", 12)).place(x=90, y=40)
+    get_post_registration_entry = Entry(window_registration)
+    get_post_registration_entry.place(x=90, y=60)
+    Label(window_registration, text="Введіть ім'я:", font=("Times New Roman", 12)).place(x=90, y=90)
+    get_name_registration_entry = Entry(window_registration)
+    get_name_registration_entry.place(x=90, y=110)
+    Label(window_registration, text="Введіть пароль:", font=("Times New Roman", 12)).place(x=90, y=140)
+    get_password_registration_entry = Entry(window_registration, show="*")
+    get_password_registration_entry.place(x=90, y=160)
+    Label(window_registration, text="Повторіть пароль:", font=("Times New Roman", 12)).place(x=90, y=190)
+    get_password_registration_entry_repeat = Entry(window_registration, show="*")
+    get_password_registration_entry_repeat.place(x=90, y=210)
+
+    registration_done = Button(window_registration, text="Зареєструватись", width=15, bg="black", fg="white",  # <--------------------------------------# БД----
+                               font=("Times New Roman", 12))
+    registration_done.place(x=80, y=260)
+
+    mistake = Label(window_registration, foreground="red", font=("Times New Roman", 12))
+    mistake.place(x=80, y=300)
+
+
+    def registration(event):
+        post_reg_get = get_post_registration_entry.get()
+        name_get = get_name_registration_entry.get()
+        password_reg_get = get_password_registration_entry.get()
+        password_reg_rep_get = get_password_registration_entry_repeat.get()
+
+        try:
+            email_is_valid = validate_email(post_reg_get, check_deliverability=True)
+            print('Email is valid')
+
+            if password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post_reg_get != '':
+                if password_reg_rep_get != password_reg_get:
+                    mistake.configure(text="Неправильний пароль!")
+                else:
+                    mistake.configure(text="")
+                    print("good")
+            else:
+                mistake.configure(text="Заповніть всі поля!")
+
+        except EmailNotValidError as e:
+            mistake.configure(text="Email невірно заповнений!")
+            print(str(e))
+
+
+    registration_done.bind("<Button-1>", registration)
+
+
+
+
+
+def window_for_login(event=None):
+    global window_registration
+    if window_registration and window_registration.winfo_exists():
+        window_registration.destroy()
+
+    window_registration = Toplevel(root)
+    window_registration.title("Вхід")
+    window_registration.geometry("300x200")
+    window_registration.resizable(True, True)
+
+    global get_post_login_label, get_post_login_entry, get_password_login_label, get_password_login_entry, login_button, registration_button
+    get_post_login_label = Label(window_registration, text="Введіть логін:", font=("Times New Roman", 12))
+    get_post_login_label.pack()
+    get_post_login_entry = Entry(window_registration)
+    get_post_login_entry.pack()
+
+    get_password_login_label = Label(window_registration, text="Введіть пароль:", font=("Times New Roman", 12))
+    get_password_login_label.pack()
+    get_password_login_entry = Entry(window_registration, show="*")
+    get_password_login_entry.pack()
+
+    login_button = Button(window_registration, text="Вхід", width=10, bg="black", fg="white",
+                          font=("Times New Roman", 12))
+    login_button.place(x=100, y=110)
+    registration_button = Button(window_registration, text="Реєстрація", width=10, bg="black", fg="white",
+                                 font=("Times New Roman", 12))
+    registration_button.place(x=100, y=140)
+
+    registration_button.bind("<Button-1>", window_for_registration)
+
+
+
+
+
 main_menu = Menu(root)
 root.config(menu=main_menu)
 
 add_menu = Menu(main_menu, tearoff=0)
 add_menu.add_command(label='Вийти', command=root_by)
+add_menu.add_command(label='Вхід', command=window_for_login)
 add_menu.add_command(label="Правила гри.", command=show_info)
 main_menu.add_cascade(label='Меню', menu=add_menu)
 
