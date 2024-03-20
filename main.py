@@ -3,6 +3,9 @@ from tkinter import messagebox
 from email_validator import validate_email, EmailNotValidError
 import webbrowser
 import random
+import mysql.connector
+from mysql.connector import Error
+from config import db_config
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -80,7 +83,7 @@ def click_2(event):
         for j in range(i + 1, len(coordinate_ship_2)):
             if coordinate_ship_2[i] == coordinate_ship_2[j]:
                 chose_another_box = True
-                print(f"{coordinate_ship_2[i]} дублюється в позиціях {i} та {j}")
+                # print(f"{coordinate_ship_2[i]} дублюється в позиціях {i} та {j}")
                 coordinate_ship_2.remove(coordinate_ship_2[i])
 
     if chose_another_box:
@@ -518,7 +521,18 @@ def get_true():
     return True
 
 
+def on_enter(event):
+    forgot_password_label.config(fg="blue", cursor="hand2")
+
+
+def on_leave(event):
+    forgot_password_label.config(fg="black", cursor="arrow")
+
+
 # ----------------------------------------------------------------------------------------------------------------------
+window_reg = None
+
+
 def root_by():
     root.quit()
 
@@ -540,20 +554,40 @@ def get_colour_dracula():
     root.configure(bg="black")
 
 
-def get_color_zalupa():
+def get_color():
     root.configure(bg="red")
 
 
-def window_for_registration(event=None):
-    window_registration.title("Реєстрація")
-    window_registration.geometry("300x340")
+# ----------------------------------------------------------------------------------------------------------------------
+def create_connection_to_mysql_db(db_host, user_name, user_password, db_name):
+    global connection
+    connection = None
+    try:
+        connection = mysql.connector.connect(
+            host=db_host,
+            user=user_name,
+            password=user_password,
+            database=db_name
+        )
+        print("Connection to DB in method is good")
+    except Error as db_connection_error:
+        print("Error in db connection: ", db_connection_error)
+        if window_reg is True:
+            mistake.configure(text="Помилка з підєднанням\nдо бази даних!")
+            mistake.place(x=75, y=300)
+        else:
+            mistake_login.configure(text="Помилка з підєднанням\nдо бази даних!")
+            mistake_login.place(x=70, y=180)
+    return connection
 
-    get_post_login_entry.destroy()
-    get_password_login_label.destroy()
-    get_post_login_label.destroy()
-    get_password_login_entry.destroy()
-    login_button.destroy()
-    registration_button.destroy()
+
+def window_for_registration(event=None):
+    global mistake, window_reg, print_password
+    window_reg = True
+    window_registration.title("Реєстрація")
+    window_registration.geometry("300x350")
+    for widget in window_registration.winfo_children():
+        widget.destroy()
 
     button_beck = Button(window_registration, text="Відмінити", width=10, bg="black", fg="white",
                          font=("Times New Roman", 12))
@@ -566,14 +600,15 @@ def window_for_registration(event=None):
     Label(window_registration, text="Введіть ім'я:", font=("Times New Roman", 12)).place(x=90, y=90)
     get_name_registration_entry = Entry(window_registration)
     get_name_registration_entry.place(x=90, y=110)
-    Label(window_registration, text="Введіть пароль:", font=("Times New Roman", 12)).place(x=90, y=140)
+    print_password = Label(window_registration, text="Введіть пароль:", font=("Times New Roman", 12))
+    print_password.place(x=90, y=140)
     get_password_registration_entry = Entry(window_registration, show="*")
     get_password_registration_entry.place(x=90, y=160)
     Label(window_registration, text="Повторіть пароль:", font=("Times New Roman", 12)).place(x=90, y=190)
     get_password_registration_entry_repeat = Entry(window_registration, show="*")
     get_password_registration_entry_repeat.place(x=90, y=210)
 
-    registration_done = Button(window_registration, text="Зареєструватись", width=15, bg="black", fg="white",  # <--------------------------------------# БД----
+    registration_done = Button(window_registration, text="Зареєструватись", width=15, bg="black", fg="white",
                                font=("Times New Roman", 12))
     registration_done.place(x=80, y=260)
 
@@ -582,6 +617,7 @@ def window_for_registration(event=None):
 
 
     def registration(event):
+        global cursor_reg, conn_reg
         post_reg_get = get_post_registration_entry.get()
         name_get = get_name_registration_entry.get()
         password_reg_get = get_password_registration_entry.get()
@@ -591,37 +627,103 @@ def window_for_registration(event=None):
             email_is_valid = validate_email(post_reg_get, check_deliverability=True)
             print('Email is valid')
 
-            if password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post_reg_get != '':
+            if password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post_reg_get != '' and not window_reg_forgot:
                 if password_reg_rep_get != password_reg_get:
                     mistake.configure(text="Неправильний пароль!")
+                    mistake.place(x=75, y=300)
                 else:
                     mistake.configure(text="")
                     print("good")
+
+                    try:
+                        conn_reg = create_connection_to_mysql_db(db_config["mysql"]["host"],
+                                                                 db_config["mysql"]["user"],
+                                                                 db_config["mysql"]["pass"],
+                                                                 "War_ship_game")
+                        # create_table
+                        with conn_reg.cursor() as cursor_reg:
+                            create_table = '''
+                                            CREATE TABLE IF NOT EXISTS User_registration (
+                                            id INT AUTO_INCREMENT,
+                                            post TEXT NOT NULL,
+                                            name TEXT NOT NULL,
+                                            password TEXT NOT NULL,
+                                            PRIMARY KEY (id)
+                                            ) ENGINE = InnoDB
+                                            '''
+                            cursor_reg.execute(create_table)
+                            conn_reg.commit()
+
+                        # get data from table
+                        with conn_reg.cursor() as cursor_reg:
+                            post_list = []
+                            select_post_from_db = 'SELECT post FROM User_registration'
+                            cursor_reg.execute(select_post_from_db)
+                            get_post_db = cursor_reg.fetchall()
+                            for posts in get_post_db:
+                                post_list.append(posts[0])
+
+                        if post_reg_get not in post_list:
+                            # print data to table
+                            with conn_reg.cursor() as cursor_reg:
+                                insert_data_registration = f'''
+                                                            INSERT INTO 
+                                                                `User_registration` (`post`, `name`, `password`)
+                                                            VALUES 
+                                                                 ('{post_reg_get}', '{name_get}', '{password_reg_get}')
+                                                            '''
+                                cursor_reg.execute(insert_data_registration)
+                                conn_reg.commit()
+
+                            with conn_reg.cursor() as cursor_reg:
+                                get_id_registration = 'SELECT LAST_INSERT_ID()'
+                                cursor_reg.execute(get_id_registration)
+                                get_id_reg = cursor_reg.fetchone()
+                                get_id = get_id_reg[0]
+                                window_registration.destroy()
+
+                        else:
+                            mistake.configure(text="Користувач з цією\nпоштою вже зареєстрований!")
+                            mistake.place(x=50, y=300)
+
+                    except Error as error:
+                        mistake.configure(text="Помилка з доступом\nдо бази даних!")
+                        mistake.place(x=80, y=300)
+                        print("fucking error: ", error)
+
+                    finally:
+                        cursor_reg.close()
+                        conn_reg.close()
+
             else:
                 mistake.configure(text="Заповніть всі поля!")
+                mistake.place(x=80, y=300)
 
         except EmailNotValidError as e:
-            mistake.configure(text="Email невірно заповнений!")
+            mistake.configure(text="Email заповнений невірно!")
+            mistake.place(x=60, y=300)
             print(str(e))
-
+        except AttributeError and NameError:
+            pass
 
     registration_done.bind("<Button-1>", registration)
 
 
-
-
-
+# ----------------------------------------------------------------------------------------------------------------------
 def window_for_login(event=None):
-    global window_registration
+    global window_registration, window_reg_forgot
     if window_registration and window_registration.winfo_exists():
         window_registration.destroy()
 
     window_registration = Toplevel(root)
     window_registration.title("Вхід")
-    window_registration.geometry("300x200")
+    window_registration.geometry("300x250")
     window_registration.resizable(True, True)
 
-    global get_post_login_label, get_post_login_entry, get_password_login_label, get_password_login_entry, login_button, registration_button
+    window_reg_forgot = False
+
+    global get_post_login_label, get_post_login_entry, get_password_login_label, get_password_login_entry, \
+           login_button, registration_button, mistake_login, forgot_password_label
     get_post_login_label = Label(window_registration, text="Введіть логін:", font=("Times New Roman", 12))
     get_post_login_label.pack()
     get_post_login_entry = Entry(window_registration)
@@ -639,12 +741,93 @@ def window_for_login(event=None):
                                  font=("Times New Roman", 12))
     registration_button.place(x=100, y=140)
 
+    mistake_login = Label(window_registration, foreground="red", font=("Times New Roman", 12))
+    mistake_login.place(x=80, y=180)
+    forgot_password_label = Label(window_registration, text="Забув пароль")
+    forgot_password_label.place(x=110, y=230)
+
     registration_button.bind("<Button-1>", window_for_registration)
 
+    def login(event):
+        global conn_log, cursor_log
+        post_log_get = get_post_login_entry.get()
+        password_log_get = get_password_login_entry.get()
+
+        if post_log_get != '' and password_log_get != '':
+            try:
+                conn_log = create_connection_to_mysql_db(db_config["mysql"]["host"],
+                                                         db_config["mysql"]["user"],
+                                                         db_config["mysql"]["pass"],
+                                                         "War_ship_game")
+
+                with conn_log.cursor() as cursor_log:
+                    post_list = []
+                    select_post_from_db = 'SELECT post FROM User_registration'
+                    cursor_log.execute(select_post_from_db)
+                    get_post_db = cursor_log.fetchall()
+                    for posts in get_post_db:
+                        post_list.append(posts[0])
+
+                if post_log_get in post_list:
+                    with conn_log.cursor() as cursor_log:
+                        select_id_pass_for_post_from_db = f'''SELECT id, password
+                                                          from User_registration WHERE post = '{post_log_get}' '''
+                        cursor_log.execute(select_id_pass_for_post_from_db)
+                        get_id_pass_from_post = cursor_log.fetchone()
+                        get_pass_from_post = get_id_pass_from_post[1]
+
+                    if get_pass_from_post == password_log_get:
+                        get_id_from_post = get_id_pass_from_post[0]
+                        print(get_id_from_post)
+                        window_registration.destroy()
+                    else:
+                        mistake_login.configure(text="Невірно введений пароль!")
+                        mistake_login.place(x=60, y=180)
+                else:
+                    mistake_login.configure(text="Користувача не знайдено!\nСпочатку треба зареєструватись.")
+                    mistake_login.place(x=40, y=180)
+
+            except Error as error:
+                mistake_login.configure(text="Помилка з доступом\nдо бази даних!")
+                mistake_login.place(x=80, y=180)
+                print("fucking error: ", error)
+            except AttributeError:
+                pass
+
+            finally:
+                if connection is not None:
+                    cursor_log.close()
+                    conn_log.close()
+                else:
+                    pass
+
+        else:
+            mistake_login.configure(text="Заповніть всі поля!")
+            mistake_login.place(x=80, y=180)
+
+    login_button.bind("<Button-1>", login)
+
+
+    def forgot_password(event):
+        global window_reg_forgot
+        window_reg_forgot = True
+        window_for_registration(event=None)
+
+        window_registration.title("Забув пароль")
+        print_password.configure(text="Введіть новий пароль:")
+        print_password.place(x=75, y=140)
 
 
 
 
+
+
+    forgot_password_label.bind("<Enter>", on_enter)
+    forgot_password_label.bind("<Leave>", on_leave)
+    forgot_password_label.bind("<Button-1>", forgot_password)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 main_menu = Menu(root)
 root.config(menu=main_menu)
 
@@ -656,7 +839,7 @@ main_menu.add_cascade(label='Меню', menu=add_menu)
 
 color_meny = Menu(main_menu, tearoff=0)
 color_meny.add_command(label='Dracula', command=get_colour_dracula)
-color_meny.add_command(label="wtf", command=get_color_zalupa)
+color_meny.add_command(label="wtf", command=get_color)
 main_menu.add_cascade(label="Тема", menu=color_meny)
 
 
