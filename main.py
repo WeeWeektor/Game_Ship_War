@@ -11,14 +11,9 @@ from config import db_config
 # ----------------------------------------------------------------------------------------------------------------------
 root = Tk()
 root.title("Морський бій")
-root.geometry("1500x600")
+root.geometry("1340x500+250+200")
 root.resizable(True, True)
 
-about_ship = "1 корабель — ряд із 4 клітин («лінкор», або «чотирипалубний»)\n" \
-             "2 кораблі — ряд із 3 клітин («крейсери», або «трипалубні»)\n" \
-             "3 кораблі — ряд із 2 клітин («есмінці», або «двопалубні»)\n" \
-             "4 кораблі — 1 клітина («підводні човни», або «однопалубні»)"
-Label(root, text=about_ship, font=("Times New Roman", 14)).place(x=0, y=400)
 Label(root, text="Ваше полотно", font=("Times New Roman", 14)).place(x=110, y=0)
 Label(root, text="Полотно суперника", font=("Times New Roman", 14)).place(x=1070, y=0)
 
@@ -28,6 +23,8 @@ j = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
 x, y, yi, xj = 0, 0, 0, 0
 
 window_registration = None
+window_user_info = None
+rand_place_ship = None
 list_with_line = []
 
 ship_var_pole = Canvas(root, width=300, height=300, bg="blue")
@@ -62,17 +59,19 @@ for element in j:
 # ----------------------------------------------------------------------------------------------------------------------
 coordinate_ship = []
 coordinate_ship_2 = []
-chose_another_box = False
+killed_ships_coordinates = []
+chose_another_box = None
 won = None
 
 
 def clear_pole():
-    ship_var_pole.delete("ship", "chip_to_place", "kill_my_ship")
-    ship_var_pole_2.delete("i_kill_ship", "ship_opponent")
+    ship_var_pole.delete("ship", "chip_to_place", "kill_my_ship", "cross_line")
+    ship_var_pole_2.delete("i_kill_ship", "ship_opponent", "cross_line_opponent")
 
 
 def click_2(event):
     global chose_another_box, won
+    chose_another_box = False
     x11, y11 = event.x % 30, event.y % 30
     x1, y1 = event.x - x11, event.y - y11
     x2, y2 = x1 + 30, y1 + 30
@@ -88,26 +87,40 @@ def click_2(event):
 
     if chose_another_box:
         pass
-        chose_another_box = False
     else:
-        if (x1, y1, x2, y2) in opponent_ship:
-            index_kill = opponent_ship.index((x1, y1, x2, y2))
-            ship_var_pole_2.create_oval(x1, y1, x2, y2, fill="gray", tags="i_kill_ship")
-            ship_var_pole_2.create_oval(x1 + 7, y1 + 7, x2 - 7, y2 - 7, fill="black", tags="i_kill_ship")
-            opponent_ship.pop(index_kill)
-            if len(opponent_ship) == 0:
-                won = True
-                ship_var_pole_2.unbind("<Button-1>")
-                messagebox.showinfo("Перемога", "Ви перемогли")
-                clear_pole()
-        else:
-            ship_var_pole_2.create_oval(x1 + 7, y1 + 7, x2 - 7, y2 - 7, fill="black", tags="i_kill_ship")
-
         if won is None:
-            m_b()
+            if (x1, y1, x2, y2) in opponent_ship:
+                index_kill = opponent_ship.index((x1, y1, x2, y2))
+                ship_var_pole_2.create_oval(x1, y1, x2, y2, fill="gray", tags="i_kill_ship")
+                ship_var_pole_2.create_oval(x1 + 7, y1 + 7, x2 - 7, y2 - 7, fill="black", tags="i_kill_ship")
+                opponent_ship.pop(index_kill)
+
+                for elem_ship in ship_list_to_red_del_opponent:
+                    if (x1, y1, x2, y2) in elem_ship:
+                        elem_ship.remove((x1, y1, x2, y2))
+                        if not elem_ship:
+                            create_red_line = ship_list_to_red_del_opponent.index(elem_ship)
+                            ship_var_pole_2.create_line(list_to_dell_ship_opponent[create_red_line], fill="red", width=3,
+                                                        tags="cross_line_opponent")
+                            ship_list_to_red_del_opponent.pop(create_red_line)
+                            list_to_dell_ship_opponent.pop(create_red_line)
+                        else:
+                            pass
+                    else:
+                        pass
+
+                if len(opponent_ship) == 0:
+                    won = True
+            else:
+                ship_var_pole_2.create_oval(x1 + 7, y1 + 7, x2 - 7, y2 - 7, fill="black", tags="i_kill_ship")
+                m_b()
         else:
-            restart()
             pass
+        if won:
+            messagebox.showinfo("Перемога", "Ви перемогли")
+            ship_var_pole_2.unbind("<Button-1>")
+            give_up_button.destroy()
+            restart()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -196,8 +209,7 @@ def himself_place_ship():
 
 
 def create_ship_opponent():
-    global rand_place_ship_2, occupied_cells_for_opponent
-    rand_place_ship_2 = True
+    global occupied_cells_for_opponent
     occupied_cells_for_opponent = []
 
     for ship_size in ship:
@@ -241,10 +253,12 @@ def create_ship_opponent():
                                              tags="ship_opponent")
 
 
-r_p_s_button = Button(root, text="r_p_s", command=random_place_ship)
-r_p_s_button.place(x=200, y=400)
-h_p_s_button = Button(root, text="h_p_s", command=himself_place_ship)
-h_p_s_button.place(x=200, y=440)
+r_p_s_button = Button(root, text="Згенерувати\nвипадковим\nчином", width=12, bg="black", fg="white",
+                      font=("Times New Roman", 12), command=random_place_ship)
+r_p_s_button.place(x=40, y=390)
+h_p_s_button = Button(root, text="З\nчистого\nлиста", width=12, bg="black", fg="white",
+                      font=("Times New Roman", 12), command=himself_place_ship)
+h_p_s_button.place(x=180, y=390)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -392,47 +406,71 @@ def place_to_pole(event):
 
 # ----------------------------------------------------------------------------------------------------------------------
 def start_war(your_ship, opponent_ship):
-    global m_b, won, give_up_button
+    global won, give_up_button, m_b
     move_bot_list = []
     count_rand_place_ship = 0
     for i in your_ship:
         count_rand_place_ship += 1
 
     if count_rand_place_ship < 20:
+        restart()
         messagebox.showerror("Помилка", "Не виставлено всіх кораблів спробуйте заново")
-        himself_place_ship()
-        pass
     else:
         ship_var_pole.configure(width=300)
         if war_button.bind("<Button-1>", get_true):
-            give_up_button = Button(root, text="Здатися", command=give_up)
-            give_up_button.place(x=200, y=520)
+            war_button.destroy()
+            give_up_button = Button(root, text="Здатися", width=12, height=3, bg="black", fg="white",
+                                    font=("Times New Roman", 12), command=give_up)
+            give_up_button.place(x=600, y=390)
 
         ship_var_pole_2.bind("<Button-1>", click_2)
 
+        list_to_dell_ship = []
+        for e_s in ship_list_to_red_del:
+            xy1 = e_s[0]
+            xy2 = e_s[-1]
+            list_to_dell_ship.append((xy1[0], xy1[1], xy2[2], xy2[3]))
+
         def move_bot():
-            global won
+            global won, m_b
             while True:
                 x_ = random.randint(0, 9)
                 y_ = random.randint(0, 9)
                 x1, y1 = x_ * 30, y_ * 30
                 x2, y2 = x1 + 30, y1 + 30
-                move_bot = (x1, y1, x2, y2)
+                move_bot_ = (x1, y1, x2, y2)
 
-                if move_bot not in move_bot_list:
-                    move_bot_list.append(move_bot)
+                if move_bot_ not in move_bot_list:
+                    move_bot_list.append(move_bot_)
                     break
 
-            if move_bot in your_ship:
-                index_kill_bot = your_ship.index(move_bot)
+            if move_bot_ in your_ship:
+                index_kill_bot = your_ship.index(move_bot_)
+                your_ship.pop(index_kill_bot)
                 ship_var_pole.create_oval(x1, y1, x2, y2, fill="gray", tags="kill_my_ship")
                 ship_var_pole.create_oval(x1 + 7, y1 + 7, x2 - 7, y2 - 7, fill="black", tags="kill_my_ship")
-                your_ship.pop(index_kill_bot)
+
+                for elem_ship in ship_list_to_red_del:
+                    if move_bot_ in elem_ship:
+                        elem_ship.remove(move_bot_)
+                        if not elem_ship:
+                            create_red_line = ship_list_to_red_del.index(elem_ship)
+                            ship_var_pole.create_line(list_to_dell_ship[create_red_line], fill="red", width=3,
+                                                      tags="cross_line")
+                            ship_list_to_red_del.pop(create_red_line)
+                            list_to_dell_ship.pop(create_red_line)
+                        else:
+                            pass
+                    else:
+                        pass
+
+                move_bot()
                 if len(your_ship) == 0:
                     won = False
-                    messagebox.showinfo("Поразка", "Ви програли")
-                    clear_pole()
+                    restart()
+                    give_up_button.destroy()
                     ship_var_pole_2.unbind("<Button-1>")
+                    messagebox.showinfo("Поразка", "Ви програли")
             else:
                 ship_var_pole.create_oval(x1 + 7, y1 + 7, x2 - 7, y2 - 7, fill="black", tags="kill_my_ship")
 
@@ -440,26 +478,50 @@ def start_war(your_ship, opponent_ship):
             m_b = move_bot
         else:
             restart()
-            pass
 
 
 def get_ships_for_start_war():
     create_ship_opponent()
-    global your_ship, sh_cord, opponent_ship
-    opponent_occupied_cells = []
-    yours_ships = []
+    global your_ship, sh_cord, opponent_ship, ship_list_to_red_del, ship_list_to_red_del_opponent, list_to_dell_ship_opponent
+    opponent_ship = []
+    yours_ship = []
+    ship_list_to_red_del = []
+    ship_list_to_red_del_opponent = []
+    list_to_dell_ship_opponent = []
 
     for i in occupied_cells_for_opponent:
         x_o = i[0] * 30
         y_o = i[1] * 30
-        opponent_occupied_cells.append((x_o, y_o, x_o+30, y_o+30))
-    opponent_ship = opponent_occupied_cells
+        opponent_ship.append((x_o, y_o, x_o+30, y_o+30))
+
+    opponent_ship_2 = opponent_ship.copy()
+    for i in ship:
+        ship_2 = []
+        for j in range(i):
+            ship_2.append(opponent_ship_2[0])
+            opponent_ship_2.pop(0)
+        ship_list_to_red_del_opponent.append(ship_2)
+
+    for e_s_o in ship_list_to_red_del_opponent:
+        xy3 = e_s_o[0]
+        xy4 = e_s_o[-1]
+        list_to_dell_ship_opponent.append((xy3[0], xy3[1], xy4[2], xy4[3]))
+
 
     if rand_place_ship:
         for i in occupied_cells:
             x = i[0] * 30
             y = i[1] * 30
-            yours_ships.append((x, y, x+30, y+30))
+            yours_ship.append((x, y, x+30, y+30))
+
+        yours_ships_2 = yours_ship.copy()
+        for i in ship:
+            ship_ = []
+            for j in range(i):
+                ship_.append(yours_ships_2[0])
+                yours_ships_2.pop(0)
+            ship_list_to_red_del.append(ship_)
+
     else:
         for i in ship_place_pole:
             if i[2] - i[0] > i[3] - i[1]:
@@ -469,48 +531,60 @@ def get_ships_for_start_war():
 
             counter_1 = 0
             counter_2 = 30
+            ship_ = []
             if is_horizontal:
                 len_ship = int((i[2] - i[0]) / 30)
                 for j in range(len_ship):
-                    yours_ships.append((i[0]+counter_1, i[1], i[0]+counter_2, i[1]+30))
+                    yours_ship.append((i[0]+counter_1, i[1], i[0]+counter_2, i[1]+30))
+                    ship_.append((i[0]+counter_1, i[1], i[0]+counter_2, i[1]+30))
                     counter_1 += 30
                     counter_2 += 30
+                ship_list_to_red_del.append(ship_)
+
             else:
                 len_ship = int((i[3] - i[1]) / 30)
                 for j in range(len_ship):
-                    yours_ships.append((i[0], i[1]+counter_1, i[0]+30, i[1]+counter_2))
+                    yours_ship.append((i[0], i[1]+counter_1, i[0]+30, i[1]+counter_2))
+                    ship_.append((i[0], i[1]+counter_1, i[0]+30, i[1]+counter_2))
                     counter_1 += 30
                     counter_2 += 30
+                ship_list_to_red_del.append(ship_)
 
-    your_ship = yours_ships
-    start_war(your_ship, opponent_ship)
+    start_war(yours_ship, opponent_ship)
 
 
 def give_up():
     giveUp = messagebox.askyesno("Здатися?", "Ви дійсно бажаєте здатися?")
     if giveUp:
         messagebox.showinfo("Поразка", "Ви програли")
-        restart()
-        clear_pole()
+        give_up_button.destroy()
         ship_var_pole.unbind("<Button-1>")
         ship_var_pole_2.unbind("<Button-1>")
+        restart()
 
 
 def restart():
-    global coordinate_ship, coordinate_ship_2, won, count_rand_place_ship
+    global coordinate_ship, coordinate_ship_2, won, rand_place_ship, count_rand_place_ship, occupied_cells, ship_place_pole, occupied_cells_2
     coordinate_ship = []
     coordinate_ship_2 = []
     count_rand_place_ship = 0
     war_button.destroy()
-    give_up_button.destroy()
+    ship_var_pole.configure(width=300)
+    rand_place_ship = None
     won = None
+    clear_pole()
+
+    # occupied_cells = []
+    # ship_place_pole = []
+    # occupied_cells_2 = []
 
 
 
 def place_button_to_root(event):
     global war_button
-    war_button = Button(root, text="Бій", command=get_ships_for_start_war)
-    war_button.place(x=200, y=480)
+    war_button = Button(root, text="Розпочати\nБій", width=12, height=3, bg="black", fg="white",
+                        font=("Times New Roman", 12), command=get_ships_for_start_war)
+    war_button.place(x=600, y=390)
 
 
 r_p_s_button.bind("<Button-1>", place_button_to_root)
@@ -518,7 +592,7 @@ h_p_s_button.bind("<Button-1>", place_button_to_root)
 
 
 def get_true():
-    return True
+    return
 
 
 def on_enter(event):
@@ -530,11 +604,12 @@ def on_leave(event):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-window_reg = None
-
-
 def root_by():
-    root.quit()
+    by = messagebox.askyesno("Вихід", "Видійсно бажаєте завершити гру?")
+    if by:
+        root.quit()
+    else:
+        pass
 
 
 def open_browser_to_get_info(url):
@@ -559,6 +634,10 @@ def get_color():
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+window_reg = None
+authenticated = False
+
+
 def create_connection_to_mysql_db(db_host, user_name, user_password, db_name):
     global connection
     connection = None
@@ -582,10 +661,10 @@ def create_connection_to_mysql_db(db_host, user_name, user_password, db_name):
 
 
 def window_for_registration(event=None):
-    global mistake, window_reg, print_password
+    global mistake, window_reg, print_password, registration_done
     window_reg = True
     window_registration.title("Реєстрація")
-    window_registration.geometry("300x350")
+    window_registration.geometry("300x350+760+300")
     for widget in window_registration.winfo_children():
         widget.destroy()
 
@@ -617,7 +696,7 @@ def window_for_registration(event=None):
 
 
     def registration(event):
-        global cursor_reg, conn_reg
+        global cursor_reg, conn_reg, conn_forgot_pass, authenticated, get_id_from_post, get_name_from_post
         post_reg_get = get_post_registration_entry.get()
         name_get = get_name_registration_entry.get()
         password_reg_get = get_password_registration_entry.get()
@@ -640,21 +719,6 @@ def window_for_registration(event=None):
                                                                  db_config["mysql"]["user"],
                                                                  db_config["mysql"]["pass"],
                                                                  "War_ship_game")
-                        # create_table
-                        with conn_reg.cursor() as cursor_reg:
-                            create_table = '''
-                                            CREATE TABLE IF NOT EXISTS User_registration (
-                                            id INT AUTO_INCREMENT,
-                                            post TEXT NOT NULL,
-                                            name TEXT NOT NULL,
-                                            password TEXT NOT NULL,
-                                            PRIMARY KEY (id)
-                                            ) ENGINE = InnoDB
-                                            '''
-                            cursor_reg.execute(create_table)
-                            conn_reg.commit()
-
-                        # get data from table
                         with conn_reg.cursor() as cursor_reg:
                             post_list = []
                             select_post_from_db = 'SELECT post FROM User_registration'
@@ -679,8 +743,10 @@ def window_for_registration(event=None):
                                 get_id_registration = 'SELECT LAST_INSERT_ID()'
                                 cursor_reg.execute(get_id_registration)
                                 get_id_reg = cursor_reg.fetchone()
-                                get_id = get_id_reg[0]
-                                window_registration.destroy()
+                                get_id_from_post = get_id_reg[0]
+                                authenticated = True
+                                get_name_from_post = name_get
+                                authenticated_get_data(event=None)
 
                         else:
                             mistake.configure(text="Користувач з цією\nпоштою вже зареєстрований!")
@@ -694,6 +760,48 @@ def window_for_registration(event=None):
                     finally:
                         cursor_reg.close()
                         conn_reg.close()
+
+            elif password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post_reg_get != '' and window_reg_forgot:
+                mistake.configure(text="")
+
+                try:
+                    conn_forgot_pass = create_connection_to_mysql_db(db_config["mysql"]["host"],
+                                                                     db_config["mysql"]["user"],
+                                                                     db_config["mysql"]["pass"],
+                                                                     "War_ship_game")
+                    with conn_forgot_pass.cursor() as cursor_forgot:
+                        select_post_name_from_db = f'''SELECT post, name, id from User_registration 
+                                                        where post = '{post_reg_get}' and name = '{name_get}' '''
+                        cursor_forgot.execute(select_post_name_from_db)
+                        get_post_name_db = cursor_forgot.fetchone()
+                        print(get_post_name_db)
+
+                        if get_post_name_db is None:
+                            mistake.configure(text="Неправильний email\nчи ім'я користувача")
+                            mistake.place(x=80, y=300)
+                        else:
+                            if password_reg_rep_get != password_reg_get:
+                                mistake.configure(text="Неправильний пароль!")
+                                mistake.place(x=75, y=300)
+                            else:
+                                with conn_forgot_pass.cursor() as cursor_forgot:
+                                    update_user_password_forgot = f'''UPDATE User_registration SET 
+                                                                      password = '{password_reg_get}' WHERE 
+                                                                      id = '{get_post_name_db[2]}' '''
+                                    cursor_forgot.execute(update_user_password_forgot)
+                                    conn_forgot_pass.commit()
+                                    print("nev password created")
+
+                                window_for_login()
+
+                except Error as error:
+                    mistake.configure(text="Помилка з доступом\nдо бази даних!")
+                    mistake.place(x=80, y=300)
+                    print("fucking error: ", error)
+
+                finally:
+                    cursor_forgot.close()
+                    conn_forgot_pass.close()
 
             else:
                 mistake.configure(text="Заповніть всі поля!")
@@ -711,13 +819,13 @@ def window_for_registration(event=None):
 
 # ----------------------------------------------------------------------------------------------------------------------
 def window_for_login(event=None):
-    global window_registration, window_reg_forgot
+    global window_registration, window_reg_forgot, authenticated
     if window_registration and window_registration.winfo_exists():
         window_registration.destroy()
 
     window_registration = Toplevel(root)
     window_registration.title("Вхід")
-    window_registration.geometry("300x250")
+    window_registration.geometry("300x250+760+300")
     window_registration.resizable(True, True)
 
     window_reg_forgot = False
@@ -749,7 +857,7 @@ def window_for_login(event=None):
     registration_button.bind("<Button-1>", window_for_registration)
 
     def login(event):
-        global conn_log, cursor_log
+        global conn_log, cursor_log, authenticated, get_id_from_post, get_name_from_post
         post_log_get = get_post_login_entry.get()
         password_log_get = get_password_login_entry.get()
 
@@ -770,7 +878,7 @@ def window_for_login(event=None):
 
                 if post_log_get in post_list:
                     with conn_log.cursor() as cursor_log:
-                        select_id_pass_for_post_from_db = f'''SELECT id, password
+                        select_id_pass_for_post_from_db = f'''SELECT id, password, name
                                                           from User_registration WHERE post = '{post_log_get}' '''
                         cursor_log.execute(select_id_pass_for_post_from_db)
                         get_id_pass_from_post = cursor_log.fetchone()
@@ -778,8 +886,10 @@ def window_for_login(event=None):
 
                     if get_pass_from_post == password_log_get:
                         get_id_from_post = get_id_pass_from_post[0]
+                        get_name_from_post = get_id_pass_from_post[2]
+                        authenticated = True
+                        authenticated_get_data(event=None)
                         print(get_id_from_post)
-                        window_registration.destroy()
                     else:
                         mistake_login.configure(text="Невірно введений пароль!")
                         mistake_login.place(x=60, y=180)
@@ -807,7 +917,6 @@ def window_for_login(event=None):
 
     login_button.bind("<Button-1>", login)
 
-
     def forgot_password(event):
         global window_reg_forgot
         window_reg_forgot = True
@@ -816,10 +925,7 @@ def window_for_login(event=None):
         window_registration.title("Забув пароль")
         print_password.configure(text="Введіть новий пароль:")
         print_password.place(x=75, y=140)
-
-
-
-
+        registration_done.configure(text="Відновити пароль")
 
 
     forgot_password_label.bind("<Enter>", on_enter)
@@ -828,14 +934,124 @@ def window_for_login(event=None):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+def authenticated_get_data(event):
+    global authenticated, label_authentication, get_info_user_button
+    if authenticated:
+        window_registration.destroy()
+        add_menu.entryconfigure(login_leave_index, label='Вийти з системи')
+        add_menu.entryconfigure(login_leave_index, command=leave_authenticated)
+
+        get_info_user_button = Button(root, text=f"Інформація\nпро\n{get_name_from_post}", width=12, height=3,
+                                      bg="black", fg="white", font=("Times New Roman", 12))
+        get_info_user_button.place(x=320, y=390)
+        get_info_user_button.bind("<Button-1>", get_user_information)
+    else:
+        pass
+
+
+def get_user_information(event):
+    global window_user_info, get_info, get_history_button
+    if window_user_info and window_user_info.winfo_exists():
+        window_user_info.destroy()
+
+    window_user_info = Toplevel(root)
+    window_user_info.title(f"{get_name_from_post}")
+    window_user_info.geometry("600x500")
+    window_user_info.resizable(True, True)
+
+    Label(window_user_info, text="Ім'я:", font=("Times New Roman", 12)).pack()
+    Label(window_user_info, text="Пошта:", font=("Times New Roman", 12)).pack()
+    Label(window_user_info, text="Кількість зіграних боїв:", font=("Times New Roman", 12)).pack()
+    get_history_button = Button(window_user_info, text="Історія\nостанніх\nбоїв:", width=10, height=3, bg="black", fg="white",
+                                font=("Times New Roman", 12))
+    get_history_button.pack()
+    mistake_info = Label(window_user_info, font=("Times New Roman", 12), foreground="red")
+    mistake_info.pack()
+    button_leave_info = Button(window_user_info, text="Вийти з системи", bg="black", fg="white",
+                               font=("Times New Roman", 12), command=leave_authenticated_info)
+    button_leave_info.pack()
+
+
+    try:
+        get_info = create_connection_to_mysql_db(db_config["mysql"]["host"],
+                                                 db_config["mysql"]["user"],
+                                                 db_config["mysql"]["pass"],
+                                                 "War_ship_game")
+        # get data from table
+        with get_info.cursor() as cursor_get_info:
+            id_list = []
+            select_id_from_db = 'SELECT id FROM User_info'
+            cursor_get_info.execute(select_id_from_db)
+            get_id_db = cursor_get_info.fetchall()
+            for id in get_id_db:
+                id_list.append(id[0])
+
+        if get_id_from_post not in id_list:
+            with get_info.cursor() as cursor_get_info:
+                insert_data_info = f'''
+                                    INSERT INTO
+                                        `User_info` (`id`, `count`, `count_win`, `count_loos`, `col_10`, `col_9`, 
+                                                     `col_8`, `col_7`, `col_6`, `col_5`, `col_4`, `col_3`, `col_2`, 
+                                                     `col_1`)
+                                    VALUES
+                                        ('{get_id_from_post}', 0, 0, 0, 'N10', 'N9', 'N8', 'N7', 'N6', 
+                                        'N5', 'N4', 'N3', 'N2', 'N1')
+                                    '''
+                cursor_get_info.execute(insert_data_info)
+                get_info.commit()
+        else:
+            pass
+
+
+
+
+    except Error as error:
+        mistake_info.configure(text="Помилка з доступом\nдо бази даних!")
+        mistake_info.place(x=80, y=300)
+        print("fucking error: ", error)
+
+    finally:
+        cursor_get_info.close()
+        get_info.close()
+
+
+    def get_history_war(event):
+        Text(window_user_info, width=50, height=10, font=("Times New Roman", 12)).pack()
+
+    get_history_button.bind("<Button-1>", get_history_war)
+
+
+
+def leave_authenticated():
+    global authenticated, get_id_from_post, leave, get_name_from_post
+    if authenticated:
+        leave = messagebox.askyesno("Вийти", "Вийти з акаунта?")
+        if leave:
+            authenticated = False
+            get_id_from_post = None
+            get_name_from_post = None
+            add_menu.entryconfigure(login_leave_index, label='Вхід в систему')
+            add_menu.entryconfigure(login_leave_index, command=window_for_login)
+            get_info_user_button.destroy()
+        else:
+            pass
+
+
+def leave_authenticated_info():
+    leave_authenticated()
+    window_user_info.destroy()
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 main_menu = Menu(root)
 root.config(menu=main_menu)
 
 add_menu = Menu(main_menu, tearoff=0)
-add_menu.add_command(label='Вийти', command=root_by)
-add_menu.add_command(label='Вхід', command=window_for_login)
+add_menu.add_command(label='Вийти з гри', command=root_by)
 add_menu.add_command(label="Правила гри.", command=show_info)
+add_menu.add_command(label='Вхід в систему', command=window_for_login)
 main_menu.add_cascade(label='Меню', menu=add_menu)
+login_leave_index = add_menu.index("Вхід в систему")
 
 color_meny = Menu(main_menu, tearoff=0)
 color_meny.add_command(label='Dracula', command=get_colour_dracula)
