@@ -70,7 +70,7 @@ def clear_pole():
 
 
 def click_2(event):
-    global chose_another_box, won
+    global chose_another_box, won, get_all_win_war, war_info_list
     chose_another_box = False
     x11, y11 = event.x % 30, event.y % 30
     x1, y1 = event.x - x11, event.y - y11
@@ -117,6 +117,9 @@ def click_2(event):
         else:
             pass
         if won:
+            if authenticated:
+                get_all_win_war += 1
+                war_info_list.insert(0, f"Бій №{get_all_war} - Виграно.")
             messagebox.showinfo("Перемога", "Ви перемогли")
             ship_var_pole_2.unbind("<Button-1>")
             give_up_button.destroy()
@@ -147,7 +150,6 @@ def random_place_ship():
                 if y + safe_zone > 10:
                     continue
 
-            # перевірка на перетин з іншими кораблями
             peretun = False
             for i in range(-1, safe_zone):
                 for j in range(-1, safe_zone):
@@ -227,7 +229,6 @@ def create_ship_opponent():
                 if y + safe_zone > 10:
                     continue
 
-            # перевірка на перетин з іншими кораблями
             peretun = False
             for i in range(-1, safe_zone):
                 for j in range(-1, safe_zone):
@@ -245,12 +246,12 @@ def create_ship_opponent():
             else:
                 occupied_cells_for_opponent.append((x, y + i))
 
-        if is_horizontal:
-            ship_var_pole_2.create_rectangle(30 * x, 30 * y, 30 * x + 30 * ship_size, 30 * y + 30, fill="black",
-                                             tags="ship_opponent")
-        else:
-            ship_var_pole_2.create_rectangle(30 * x, 30 * y, 30 * x + 30, 30 * y + 30 * ship_size, fill="black",
-                                             tags="ship_opponent")
+        # if is_horizontal:
+        #     ship_var_pole_2.create_rectangle(30 * x, 30 * y, 30 * x + 30 * ship_size, 30 * y + 30, fill="black",
+        #                                      tags="ship_opponent")
+        # else:
+        #     ship_var_pole_2.create_rectangle(30 * x, 30 * y, 30 * x + 30, 30 * y + 30 * ship_size, fill="black",
+        #                                      tags="ship_opponent")
 
 
 r_p_s_button = Button(root, text="Згенерувати\nвипадковим\nчином", width=12, bg="black", fg="white",
@@ -406,7 +407,7 @@ def place_to_pole(event):
 
 # ----------------------------------------------------------------------------------------------------------------------
 def start_war(your_ship, opponent_ship):
-    global won, give_up_button, m_b
+    global won, give_up_button, m_b, last_hit_coord, get_all_war
     move_bot_list = []
     count_rand_place_ship = 0
     for i in your_ship:
@@ -416,6 +417,8 @@ def start_war(your_ship, opponent_ship):
         restart()
         messagebox.showerror("Помилка", "Не виставлено всіх кораблів спробуйте заново")
     else:
+        if authenticated:
+            get_all_war += 1
         ship_var_pole.configure(width=300)
         if war_button.bind("<Button-1>", get_true):
             war_button.destroy()
@@ -432,13 +435,31 @@ def start_war(your_ship, opponent_ship):
             list_to_dell_ship.append((xy1[0], xy1[1], xy2[2], xy2[3]))
 
         def move_bot():
-            global won, m_b
+            global won, m_b, last_hit_coord, get_all_loss_war, war_info_list
+
+            def find_next_move(coord):
+                x, y = coord
+                directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+                random.shuffle(directions)
+                for dx, dy in directions:
+                    new_x, new_y = x + dx, y + dy
+                    if 0 <= new_x < 10 and 0 <= new_y < 10 and (
+                            new_x * 30, new_y * 30, new_x * 30 + 30, new_y * 30 + 30) not in move_bot_list:
+                        return new_x * 30, new_y * 30, new_x * 30 + 30, new_y * 30 + 30
+                return None
+
             while True:
-                x_ = random.randint(0, 9)
-                y_ = random.randint(0, 9)
-                x1, y1 = x_ * 30, y_ * 30
-                x2, y2 = x1 + 30, y1 + 30
-                move_bot_ = (x1, y1, x2, y2)
+                if last_hit_coord is None:
+                    x_ = random.randint(0, 9)
+                    y_ = random.randint(0, 9)
+                    x1, y1 = x_ * 30, y_ * 30
+                    x2, y2 = x1 + 30, y1 + 30
+                    move_bot_ = (x1, y1, x2, y2)
+                else:
+                    move_bot_ = find_next_move(last_hit_coord)
+                    if move_bot_ is None:
+                        last_hit_coord = None
+                        continue
 
                 if move_bot_ not in move_bot_list:
                     move_bot_list.append(move_bot_)
@@ -447,8 +468,10 @@ def start_war(your_ship, opponent_ship):
             if move_bot_ in your_ship:
                 index_kill_bot = your_ship.index(move_bot_)
                 your_ship.pop(index_kill_bot)
-                ship_var_pole.create_oval(x1, y1, x2, y2, fill="gray", tags="kill_my_ship")
-                ship_var_pole.create_oval(x1 + 7, y1 + 7, x2 - 7, y2 - 7, fill="black", tags="kill_my_ship")
+                ship_var_pole.create_oval(move_bot_[0], move_bot_[1], move_bot_[2], move_bot_[3], fill="gray",
+                                          tags="kill_my_ship")
+                ship_var_pole.create_oval(move_bot_[0] + 7, move_bot_[1] + 7, move_bot_[2] - 7, move_bot_[3] - 7,
+                                          fill="black", tags="kill_my_ship")
 
                 for elem_ship in ship_list_to_red_del:
                     if move_bot_ in elem_ship:
@@ -459,25 +482,32 @@ def start_war(your_ship, opponent_ship):
                                                       tags="cross_line")
                             ship_list_to_red_del.pop(create_red_line)
                             list_to_dell_ship.pop(create_red_line)
+                            last_hit_coord = None
                         else:
-                            pass
+                            last_hit_coord = (move_bot_[0] // 30, move_bot_[1] // 30)
                     else:
                         pass
 
                 move_bot()
                 if len(your_ship) == 0:
                     won = False
+                    if authenticated:
+                        get_all_loss_war += 1
+                        war_info_list.insert(0, f"Бій №{get_all_war} - Програно.")
                     restart()
                     give_up_button.destroy()
                     ship_var_pole_2.unbind("<Button-1>")
                     messagebox.showinfo("Поразка", "Ви програли")
             else:
-                ship_var_pole.create_oval(x1 + 7, y1 + 7, x2 - 7, y2 - 7, fill="black", tags="kill_my_ship")
+                ship_var_pole.create_oval(move_bot_[0]+7, move_bot_[1]+7, move_bot_[2]-7, move_bot_[3]-7, fill="black",
+                                          tags="kill_my_ship")
 
         if won is None:
             m_b = move_bot
         else:
             restart()
+
+        last_hit_coord = None
 
 
 def get_ships_for_start_war():
@@ -554,8 +584,12 @@ def get_ships_for_start_war():
 
 
 def give_up():
+    global get_all_loss_war, war_info_list
     giveUp = messagebox.askyesno("Здатися?", "Ви дійсно бажаєте здатися?")
     if giveUp:
+        if authenticated:
+            get_all_loss_war += 1
+            war_info_list.insert(0, f"Бій №{get_all_war} - Програно.")
         messagebox.showinfo("Поразка", "Ви програли")
         give_up_button.destroy()
         ship_var_pole.unbind("<Button-1>")
@@ -573,11 +607,6 @@ def restart():
     rand_place_ship = None
     won = None
     clear_pole()
-
-    # occupied_cells = []
-    # ship_place_pole = []
-    # occupied_cells_2 = []
-
 
 
 def place_button_to_root(event):
@@ -696,17 +725,18 @@ def window_for_registration(event=None):
 
 
     def registration(event):
-        global cursor_reg, conn_reg, conn_forgot_pass, authenticated, get_id_from_post, get_name_from_post
-        post_reg_get = get_post_registration_entry.get()
+        global cursor_reg, conn_reg, conn_forgot_pass, authenticated, get_id_from_post, get_name_from_post, \
+               get_all_war, get_all_win_war, get_all_loss_war, war_info_list, post__get
+        post__get = get_post_registration_entry.get()
         name_get = get_name_registration_entry.get()
         password_reg_get = get_password_registration_entry.get()
         password_reg_rep_get = get_password_registration_entry_repeat.get()
 
         try:
-            email_is_valid = validate_email(post_reg_get, check_deliverability=True)
+            email_is_valid = validate_email(post__get, check_deliverability=True)
             print('Email is valid')
 
-            if password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post_reg_get != '' and not window_reg_forgot:
+            if password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post__get != '' and not window_reg_forgot:
                 if password_reg_rep_get != password_reg_get:
                     mistake.configure(text="Неправильний пароль!")
                     mistake.place(x=75, y=300)
@@ -727,14 +757,14 @@ def window_for_registration(event=None):
                             for posts in get_post_db:
                                 post_list.append(posts[0])
 
-                        if post_reg_get not in post_list:
+                        if post__get not in post_list:
                             # print data to table
                             with conn_reg.cursor() as cursor_reg:
                                 insert_data_registration = f'''
                                                             INSERT INTO 
                                                                 `User_registration` (`post`, `name`, `password`)
                                                             VALUES 
-                                                                 ('{post_reg_get}', '{name_get}', '{password_reg_get}')
+                                                                 ('{post__get}', '{name_get}', '{password_reg_get}')
                                                             '''
                                 cursor_reg.execute(insert_data_registration)
                                 conn_reg.commit()
@@ -745,6 +775,7 @@ def window_for_registration(event=None):
                                 get_id_reg = cursor_reg.fetchone()
                                 get_id_from_post = get_id_reg[0]
                                 authenticated = True
+                                get_all_war, get_all_win_war, get_all_loss_war, war_info_list = None, None, None, None
                                 get_name_from_post = name_get
                                 authenticated_get_data(event=None)
 
@@ -755,13 +786,13 @@ def window_for_registration(event=None):
                     except Error as error:
                         mistake.configure(text="Помилка з доступом\nдо бази даних!")
                         mistake.place(x=80, y=300)
-                        print("fucking error: ", error)
+                        print("Error: ", error)
 
                     finally:
                         cursor_reg.close()
                         conn_reg.close()
 
-            elif password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post_reg_get != '' and window_reg_forgot:
+            elif password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post__get != '' and window_reg_forgot:
                 mistake.configure(text="")
 
                 try:
@@ -771,7 +802,7 @@ def window_for_registration(event=None):
                                                                      "War_ship_game")
                     with conn_forgot_pass.cursor() as cursor_forgot:
                         select_post_name_from_db = f'''SELECT post, name, id from User_registration 
-                                                        where post = '{post_reg_get}' and name = '{name_get}' '''
+                                                        where post = '{post__get}' and name = '{name_get}' '''
                         cursor_forgot.execute(select_post_name_from_db)
                         get_post_name_db = cursor_forgot.fetchone()
                         print(get_post_name_db)
@@ -797,7 +828,7 @@ def window_for_registration(event=None):
                 except Error as error:
                     mistake.configure(text="Помилка з доступом\nдо бази даних!")
                     mistake.place(x=80, y=300)
-                    print("fucking error: ", error)
+                    print("Error: ", error)
 
                 finally:
                     cursor_forgot.close()
@@ -819,7 +850,9 @@ def window_for_registration(event=None):
 
 # ----------------------------------------------------------------------------------------------------------------------
 def window_for_login(event=None):
-    global window_registration, window_reg_forgot, authenticated
+    global window_registration, window_reg_forgot, authenticated, post__get, get_post_login_label, get_post_login_entry, \
+           get_password_login_label, get_password_login_entry, login_button, registration_button, mistake_login, \
+           forgot_password_label
     if window_registration and window_registration.winfo_exists():
         window_registration.destroy()
 
@@ -830,8 +863,6 @@ def window_for_login(event=None):
 
     window_reg_forgot = False
 
-    global get_post_login_label, get_post_login_entry, get_password_login_label, get_password_login_entry, \
-           login_button, registration_button, mistake_login, forgot_password_label
     get_post_login_label = Label(window_registration, text="Введіть логін:", font=("Times New Roman", 12))
     get_post_login_label.pack()
     get_post_login_entry = Entry(window_registration)
@@ -857,11 +888,12 @@ def window_for_login(event=None):
     registration_button.bind("<Button-1>", window_for_registration)
 
     def login(event):
-        global conn_log, cursor_log, authenticated, get_id_from_post, get_name_from_post
-        post_log_get = get_post_login_entry.get()
+        global conn_log, cursor_log, authenticated, get_id_from_post, get_name_from_post, get_all_war, get_all_win_war, \
+               get_all_loss_war, war_info_list, post__get
+        post__get = get_post_login_entry.get()
         password_log_get = get_password_login_entry.get()
 
-        if post_log_get != '' and password_log_get != '':
+        if post__get != '' and password_log_get != '':
             try:
                 conn_log = create_connection_to_mysql_db(db_config["mysql"]["host"],
                                                          db_config["mysql"]["user"],
@@ -876,10 +908,10 @@ def window_for_login(event=None):
                     for posts in get_post_db:
                         post_list.append(posts[0])
 
-                if post_log_get in post_list:
+                if post__get in post_list:
                     with conn_log.cursor() as cursor_log:
                         select_id_pass_for_post_from_db = f'''SELECT id, password, name
-                                                          from User_registration WHERE post = '{post_log_get}' '''
+                                                          from User_registration WHERE post = '{post__get}' '''
                         cursor_log.execute(select_id_pass_for_post_from_db)
                         get_id_pass_from_post = cursor_log.fetchone()
                         get_pass_from_post = get_id_pass_from_post[1]
@@ -888,6 +920,7 @@ def window_for_login(event=None):
                         get_id_from_post = get_id_pass_from_post[0]
                         get_name_from_post = get_id_pass_from_post[2]
                         authenticated = True
+                        get_all_war, get_all_win_war, get_all_loss_war, war_info_list = None, None, None, None
                         authenticated_get_data(event=None)
                         print(get_id_from_post)
                     else:
@@ -900,7 +933,7 @@ def window_for_login(event=None):
             except Error as error:
                 mistake_login.configure(text="Помилка з доступом\nдо бази даних!")
                 mistake_login.place(x=80, y=180)
-                print("fucking error: ", error)
+                print("Error: ", error)
             except AttributeError:
                 pass
 
@@ -950,34 +983,40 @@ def authenticated_get_data(event):
 
 
 def get_user_information(event):
-    global window_user_info, get_info, get_history_button
+    global window_user_info, get_info, get_history_button, get_all_war, get_all_win_war, get_all_loss_war, \
+           get_history_war, war_info_list, all_war_label, win_war_label, loss_war_label, info_war_text
     if window_user_info and window_user_info.winfo_exists():
         window_user_info.destroy()
 
     window_user_info = Toplevel(root)
     window_user_info.title(f"{get_name_from_post}")
-    window_user_info.geometry("600x500")
+    window_user_info.geometry("400x500+705+220")
     window_user_info.resizable(True, True)
 
-    Label(window_user_info, text="Ім'я:", font=("Times New Roman", 12)).pack()
-    Label(window_user_info, text="Пошта:", font=("Times New Roman", 12)).pack()
-    Label(window_user_info, text="Кількість зіграних боїв:", font=("Times New Roman", 12)).pack()
-    get_history_button = Button(window_user_info, text="Історія\nостанніх\nбоїв:", width=10, height=3, bg="black", fg="white",
-                                font=("Times New Roman", 12))
+    Label(window_user_info, text=f"Ім'я: {get_name_from_post}", font=("Times New Roman", 12)).pack()
+    Label(window_user_info, text=f"Пошта: {post__get}", font=("Times New Roman", 12)).pack()
+    get_history_button = Button(window_user_info, text="Історія\nостанніх\nбоїв:", width=10, height=3, bg="black",
+                                fg="white", font=("Times New Roman", 12))
     get_history_button.pack()
-    mistake_info = Label(window_user_info, font=("Times New Roman", 12), foreground="red")
-    mistake_info.pack()
+    all_war_label = Label(window_user_info, font=("Times New Roman", 12))
+    all_war_label.pack()
+    win_war_label = Label(window_user_info, font=("Times New Roman", 12))
+    win_war_label.pack()
+    loss_war_label = Label(window_user_info, font=("Times New Roman", 12))
+    loss_war_label.pack()
+    info_war_text = Listbox(window_user_info, width=30, height=10, font=("Times New Roman", 12))
+    info_war_text.pack()
     button_leave_info = Button(window_user_info, text="Вийти з системи", bg="black", fg="white",
                                font=("Times New Roman", 12), command=leave_authenticated_info)
     button_leave_info.pack()
-
+    mistake_info = Label(window_user_info, font=("Times New Roman", 12), foreground="red")
+    mistake_info.pack()
 
     try:
         get_info = create_connection_to_mysql_db(db_config["mysql"]["host"],
                                                  db_config["mysql"]["user"],
                                                  db_config["mysql"]["pass"],
                                                  "War_ship_game")
-        # get data from table
         with get_info.cursor() as cursor_get_info:
             id_list = []
             select_id_from_db = 'SELECT id FROM User_info'
@@ -1002,13 +1041,9 @@ def get_user_information(event):
         else:
             pass
 
-
-
-
     except Error as error:
         mistake_info.configure(text="Помилка з доступом\nдо бази даних!")
-        mistake_info.place(x=80, y=300)
-        print("fucking error: ", error)
+        print("Error: ", error)
 
     finally:
         cursor_get_info.close()
@@ -1016,10 +1051,63 @@ def get_user_information(event):
 
 
     def get_history_war(event):
-        Text(window_user_info, width=50, height=10, font=("Times New Roman", 12)).pack()
+        global get_user_info, get_all_war, get_all_win_war, get_all_loss_war, war_info_list
+        try:
+            get_user_info = create_connection_to_mysql_db(db_config["mysql"]["host"],
+                                                          db_config["mysql"]["user"],
+                                                          db_config["mysql"]["pass"],
+                                                          "War_ship_game")
+            if get_all_war is None or get_all_loss_war is None or get_all_win_war is None or war_info_list == []:
+                with get_user_info.cursor() as cursor_get_user_info:
+                    select_user_game_data_from_db = f'''SELECT * FROM User_info where id = '{get_id_from_post}' '''
+                    cursor_get_user_info.execute(select_user_game_data_from_db)
+                    get_data_db = cursor_get_user_info.fetchone()
+
+                war_info_list = []
+                get_all_war = int(get_data_db[1])
+                get_all_win_war = int(get_data_db[2])
+                get_all_loss_war = int(get_data_db[3])
+                co = 4
+                for war_info in range(4, 14):
+                    war_info_list.append(get_data_db[war_info])
+                    co += 1
+
+            else:
+                with get_user_info.cursor() as cursor_get_user_info:
+                    update_user_war_info = f'''UPDATE User_info SET 
+                                                            count = '{get_all_war}',
+                                                            count_win = '{get_all_win_war}',
+                                                            count_loos = '{get_all_loss_war}',
+                                                            col_10 = '{war_info_list[0]}',
+                                                            col_9 = '{war_info_list[1]}',
+                                                            col_8 = '{war_info_list[2]}',
+                                                            col_7 = '{war_info_list[3]}',
+                                                            col_6 = '{war_info_list[4]}',
+                                                            col_5 = '{war_info_list[5]}',
+                                                            col_4 = '{war_info_list[6]}',
+                                                            col_3 = '{war_info_list[7]}',
+                                                            col_2 = '{war_info_list[8]}',
+                                                            col_1 = '{war_info_list[9]}'
+                                                        WHERE id = '{get_id_from_post}' '''
+                    cursor_get_user_info.execute(update_user_war_info)
+                    get_user_info.commit()
+
+                for elem in war_info_list:
+                    info_war_text.insert(END, elem)
+
+                all_war_label.configure(text=f"Кількість зіграних боїв: {get_all_war}")
+                win_war_label.configure(text=f"Кількість виграних боїв: {get_all_win_war}")
+                loss_war_label.configure(text=f"Кількість програних боїв: {get_all_loss_war}")
+
+        except Error as error:
+            mistake_info.configure(text="Помилка з доступом\nдо бази даних!")
+            print("Error: ", error)
+
+        finally:
+            cursor_get_user_info.close()
+            get_user_info.close()
 
     get_history_button.bind("<Button-1>", get_history_war)
-
 
 
 def leave_authenticated():
