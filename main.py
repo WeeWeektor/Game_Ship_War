@@ -6,6 +6,9 @@ import random
 import mysql.connector
 from mysql.connector import Error
 from config import db_config
+from pytz import timezone
+import datetime
+import pygame
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -24,8 +27,10 @@ x, y, yi, xj = 0, 0, 0, 0
 
 window_registration = None
 window_user_info = None
-rand_place_ship = None
+rand_place_ship = False
+him_place_ship = False
 list_with_line = []
+check_button_info = IntVar()
 
 ship_var_pole = Canvas(root, width=300, height=300, bg="blue")
 ship_var_pole.place(x=20, y=60)
@@ -65,8 +70,8 @@ won = None
 
 
 def clear_pole():
-    ship_var_pole.delete("ship", "chip_to_place", "kill_my_ship", "cross_line")
-    ship_var_pole_2.delete("i_kill_ship", "ship_opponent", "cross_line_opponent")
+    ship_var_pole.delete("ship", "chip_to_place", "kill_my_ship", "cross_line", "occupied_cells")
+    ship_var_pole_2.delete("i_kill_ship", "ship_opponent", "cross_line_opponent", "occupied_cells_op_pole")
 
 
 def click_2(event):
@@ -95,13 +100,60 @@ def click_2(event):
                 ship_var_pole_2.create_oval(x1 + 7, y1 + 7, x2 - 7, y2 - 7, fill="black", tags="i_kill_ship")
                 opponent_ship.pop(index_kill)
 
+                def ocup_cels(move__occupied, time__):
+                    el = None
+                    for el in move__occupied:
+                        if el > 300 or el < 0:
+                            el = False
+                        else:
+                            el = True
+
+                    if el:
+                        if move__occupied not in coordinate_ship_2:
+                            if check_button_info.get() == 1:
+                                coordinate_ship_2.append(move__occupied)
+                                if time__:
+                                    ship_var_pole_2.create_oval(move__occupied[0]+7, move__occupied[1]+7,
+                                                                move__occupied[2]-7, move__occupied[3]-7,
+                                                                fill="black", tags="occupied_cells_op_pole")
+                                else:
+                                    ship_var_pole_2.create_oval(move__occupied[0]+7, move__occupied[1]+7,
+                                                                move__occupied[2]-7, move__occupied[3]-7,
+                                                                fill="black", tags="occupied_cells_op_pole")
+                            else:
+                                pass
+                    else:
+                        pass
+
+                move__occupied_1 = (x1-30, y1-30, x1, y1)
+                move__occupied_2 = (x2, y1-30, x2+30, y1)
+                move__occupied_3 = (x1-30, y2, x1, y2+30)
+                move__occupied_4 = (x2, y2, x2+30, y2+30)
+
+                ocup_cels(move__occupied_1, True)
+                ocup_cels(move__occupied_2, True)
+                ocup_cels(move__occupied_3, True)
+                ocup_cels(move__occupied_4, True)
+
                 for elem_ship in ship_list_to_red_del_opponent:
                     if (x1, y1, x2, y2) in elem_ship:
                         elem_ship.remove((x1, y1, x2, y2))
                         if not elem_ship:
                             create_red_line = ship_list_to_red_del_opponent.index(elem_ship)
-                            ship_var_pole_2.create_line(list_to_dell_ship_opponent[create_red_line], fill="red", width=3,
-                                                        tags="cross_line_opponent")
+                            ship_var_pole_2.create_line(list_to_dell_ship_opponent[create_red_line], fill="red", width=3
+                                                        , tags="cross_line_opponent")
+
+                            e = list_to_dell_ship_opponent[create_red_line]
+                            move__occupied_5 = (e[0], e[1] - 30, e[0] + 30, e[1])
+                            move__occupied_6 = (e[0] - 30, e[1], e[0], e[1] + 30)
+                            move__occupied_7 = (e[2], e[3] - 30, e[2] + 30, e[3])
+                            move__occupied_8 = (e[2] - 30, e[3], e[2], e[3] + 30)
+
+                            ocup_cels(move__occupied_5, False)
+                            ocup_cels(move__occupied_6, False)
+                            ocup_cels(move__occupied_7, False)
+                            ocup_cels(move__occupied_8, False)
+
                             ship_list_to_red_del_opponent.pop(create_red_line)
                             list_to_dell_ship_opponent.pop(create_red_line)
                         else:
@@ -117,9 +169,11 @@ def click_2(event):
         else:
             pass
         if won:
+            stop_music_play()
             if authenticated:
                 get_all_win_war += 1
-                war_info_list.insert(0, f"Бій №{get_all_war} - Виграно.")
+                war_info_list.insert(0, f"Бій №{get_all_war} ({get_time()}) - Виграно.")
+            music_play_won_or_not()
             messagebox.showinfo("Перемога", "Ви перемогли")
             ship_var_pole_2.unbind("<Button-1>")
             give_up_button.destroy()
@@ -128,8 +182,9 @@ def click_2(event):
 
 # ----------------------------------------------------------------------------------------------------------------------
 def random_place_ship():
-    global rand_place_ship, occupied_cells
-    rand_place_ship = True
+    global rand_place_ship, occupied_cells, him_place_ship
+    rand_place_ship, him_place_ship = True, False
+    place_button_to_root()
     ship_var_pole.configure(width=300)
     clear_pole()
     ship_var_pole.unbind("<Button-1>")
@@ -174,8 +229,9 @@ def random_place_ship():
 
 
 def himself_place_ship():
-    global rand_place_ship, occupied_cells_2, ship_place_pole
-    rand_place_ship = False
+    global rand_place_ship, occupied_cells_2, ship_place_pole, him_place_ship
+    him_place_ship, rand_place_ship = True, False
+    place_button_to_root()
     ship_var_pole.configure(width=570)
     clear_pole()
     occupied_cells_2 = []
@@ -254,14 +310,6 @@ def create_ship_opponent():
         #                                      tags="ship_opponent")
 
 
-r_p_s_button = Button(root, text="Згенерувати\nвипадковим\nчином", width=12, bg="black", fg="white",
-                      font=("Times New Roman", 12), command=random_place_ship)
-r_p_s_button.place(x=40, y=390)
-h_p_s_button = Button(root, text="З\nчистого\nлиста", width=12, bg="black", fg="white",
-                      font=("Times New Roman", 12), command=himself_place_ship)
-h_p_s_button.place(x=180, y=390)
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 is_reversed = False
 selected_item = 0
@@ -271,7 +319,7 @@ def clic_to_revers_ship(event):
     global selected_item, is_reversed
     ship_var_pole.bind("<Button-3>", clic_to_get_ship(event))
 
-    if selected_item and not rand_place_ship:
+    if selected_item and him_place_ship:
         x0, y0, x1, y1 = ship_var_pole.coords(selected_item)
         width = x1 - x0
         height = y1 - y0
@@ -288,7 +336,7 @@ def clic_to_revers_ship(event):
 def relocation_himself(event):
     global selected_item, relocated_ship
     x, y = event.x, event.y
-    if selected_item and not rand_place_ship:
+    if selected_item and him_place_ship:
         x0, y0, x1, y1 = ship_var_pole.coords(selected_item)
         width = x1 - x0
         height = y1 - y0
@@ -300,7 +348,7 @@ def relocation_himself(event):
 
 def clic_to_get_ship(event):
     global selected_item, offset_x, offset_y
-    if not rand_place_ship:
+    if him_place_ship:
         selected_item = ship_var_pole.find_overlapping(event.x, event.y, event.x, event.y)
     if selected_item:
         x0, y0, x1, y1 = ship_var_pole.coords(selected_item)
@@ -315,7 +363,7 @@ def clic_to_get_ship(event):
 def place_to_pole(event):
     global selected_item, is_reversed, occupied_cells_2, ship_place_pole
 
-    if selected_item and not rand_place_ship:
+    if selected_item and him_place_ship:
         x0, y0, x1, y1 = ship_var_pole.coords(selected_item)
         width = x1 - x0
         height = y1 - y0
@@ -395,19 +443,16 @@ def place_to_pole(event):
                     occupied_cells_2.extend([(closest_x - 1, closest_y + i), (closest_x + 1, closest_y + i)])
                     for j in range(-1, 2):
                         occupied_cells_2.append((closest_x, closest_y + i + j))
-
             # print(occupied_cells_2)
-
         else:
             print("Немає доступних позицій для розміщення корабля.")
-
     else:
         pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 def start_war(your_ship, opponent_ship):
-    global won, give_up_button, m_b, last_hit_coord, get_all_war
+    global won, give_up_button, m_b, last_hit_coord, get_all_war, rand_place_ship, him_place_ship
     move_bot_list = []
     count_rand_place_ship = 0
     for i in your_ship:
@@ -417,14 +462,18 @@ def start_war(your_ship, opponent_ship):
         restart()
         messagebox.showerror("Помилка", "Не виставлено всіх кораблів спробуйте заново")
     else:
+        music_play()
+        rand_place_ship, him_place_ship = False, False
         if authenticated:
             get_all_war += 1
         ship_var_pole.configure(width=300)
-        if war_button.bind("<Button-1>", get_true):
-            war_button.destroy()
-            give_up_button = Button(root, text="Здатися", width=12, height=3, bg="black", fg="white",
-                                    font=("Times New Roman", 12), command=give_up)
-            give_up_button.place(x=600, y=390)
+        war_button.destroy()
+        r_p_s_button.destroy()
+        h_p_s_button.destroy()
+        check_button.destroy()
+        give_up_button = Button(root, text="Здатися", width=12, height=3, bg="black", fg="white",
+                                font=("Times New Roman", 12), command=give_up)
+        give_up_button.place(x=600, y=390)
 
         ship_var_pole_2.bind("<Button-1>", click_2)
 
@@ -473,6 +522,41 @@ def start_war(your_ship, opponent_ship):
                 ship_var_pole.create_oval(move_bot_[0] + 7, move_bot_[1] + 7, move_bot_[2] - 7, move_bot_[3] - 7,
                                           fill="black", tags="kill_my_ship")
 
+                def move_b(move_bot_occupied, time_):
+                    el = None
+                    for el in move_bot_occupied:
+                        if el > 300 or el < 0:
+                            el = False
+                        else:
+                            el = True
+
+                    if el:
+                        if move_bot_occupied not in move_bot_list:
+                            move_bot_list.append(move_bot_occupied)
+                            if check_button_info.get() == 1:
+                                if time_:
+                                    ship_var_pole.create_oval(move_bot_occupied[0]+7, move_bot_occupied[1]+7,
+                                                              move_bot_occupied[2]-7, move_bot_occupied[3]-7,
+                                                              fill="black", tags="occupied_cells")
+                                else:
+                                    ship_var_pole.create_oval(move_bot_occupied[0]+7, move_bot_occupied[1]+7,
+                                                              move_bot_occupied[2]-7, move_bot_occupied[3]-7,
+                                                              fill="black", tags="occupied_cells")
+                            else:
+                                pass
+                    else:
+                        pass
+
+                move_bot_occupied_1 = (move_bot_[0]-30, move_bot_[1]-30, move_bot_[0], move_bot_[1])
+                move_bot_occupied_2 = (move_bot_[2], move_bot_[1]-30, move_bot_[2]+30, move_bot_[1])
+                move_bot_occupied_3 = (move_bot_[0]-30, move_bot_[3], move_bot_[0], move_bot_[3]+30)
+                move_bot_occupied_4 = (move_bot_[2], move_bot_[3], move_bot_[2]+30, move_bot_[3]+30)
+
+                move_b(move_bot_occupied_1, True)
+                move_b(move_bot_occupied_2, True)
+                move_b(move_bot_occupied_3, True)
+                move_b(move_bot_occupied_4, True)
+
                 for elem_ship in ship_list_to_red_del:
                     if move_bot_ in elem_ship:
                         elem_ship.remove(move_bot_)
@@ -480,24 +564,40 @@ def start_war(your_ship, opponent_ship):
                             create_red_line = ship_list_to_red_del.index(elem_ship)
                             ship_var_pole.create_line(list_to_dell_ship[create_red_line], fill="red", width=3,
                                                       tags="cross_line")
+
+                            e = list_to_dell_ship[create_red_line]
+                            move_bot_occupied_5 = (e[0], e[1]-30, e[0]+30, e[1])
+                            move_bot_occupied_6 = (e[0]-30, e[1], e[0], e[1]+30)
+                            move_bot_occupied_7 = (e[2], e[3]-30, e[2]+30, e[3])
+                            move_bot_occupied_8 = (e[2]-30, e[3], e[2], e[3]+30)
+
+                            move_b(move_bot_occupied_5, False)
+                            move_b(move_bot_occupied_6, False)
+                            move_b(move_bot_occupied_7, False)
+                            move_b(move_bot_occupied_8, False)
+
                             ship_list_to_red_del.pop(create_red_line)
                             list_to_dell_ship.pop(create_red_line)
                             last_hit_coord = None
+
                         else:
                             last_hit_coord = (move_bot_[0] // 30, move_bot_[1] // 30)
                     else:
                         pass
 
-                move_bot()
-                if len(your_ship) == 0:
+                if len(your_ship) != 0:
+                    move_bot()
+                else:
+                    stop_music_play()
                     won = False
                     if authenticated:
                         get_all_loss_war += 1
-                        war_info_list.insert(0, f"Бій №{get_all_war} - Програно.")
-                    restart()
+                        war_info_list.insert(0, f"Бій №{get_all_war} ({get_time()}) - Програно.")
+                    music_play_won_or_not()
+                    messagebox.showinfo("Поразка", "Ви програли")
                     give_up_button.destroy()
                     ship_var_pole_2.unbind("<Button-1>")
-                    messagebox.showinfo("Поразка", "Ви програли")
+                    restart()
             else:
                 ship_var_pole.create_oval(move_bot_[0]+7, move_bot_[1]+7, move_bot_[2]-7, move_bot_[3]-7, fill="black",
                                           tags="kill_my_ship")
@@ -511,8 +611,9 @@ def start_war(your_ship, opponent_ship):
 
 
 def get_ships_for_start_war():
+    global your_ship, sh_cord, opponent_ship, ship_list_to_red_del, ship_list_to_red_del_opponent, \
+        list_to_dell_ship_opponent
     create_ship_opponent()
-    global your_ship, sh_cord, opponent_ship, ship_list_to_red_del, ship_list_to_red_del_opponent, list_to_dell_ship_opponent
     opponent_ship = []
     yours_ship = []
     ship_list_to_red_del = []
@@ -552,7 +653,7 @@ def get_ships_for_start_war():
                 yours_ships_2.pop(0)
             ship_list_to_red_del.append(ship_)
 
-    else:
+    elif him_place_ship:
         for i in ship_place_pole:
             if i[2] - i[0] > i[3] - i[1]:
                 is_horizontal = True
@@ -579,17 +680,45 @@ def get_ships_for_start_war():
                     counter_1 += 30
                     counter_2 += 30
                 ship_list_to_red_del.append(ship_)
+    else:
+        pass
 
     start_war(yours_ship, opponent_ship)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def place_button_to_root():
+    global war_button
+    war_button = Button(root, text="Розпочати\nБій", width=12, height=3, bg="black", fg="white",
+                        font=("Times New Roman", 12), command=get_ships_for_start_war)
+    war_button.place(x=600, y=390)
+
+
+def please_button_2x():
+    global r_p_s_button, h_p_s_button, check_button
+    r_p_s_button = Button(root, text="Згенерувати\nвипадковим\nчином", width=12, bg="black", fg="white",
+                          font=("Times New Roman", 12), command=random_place_ship)
+    r_p_s_button.place(x=40, y=390)
+    h_p_s_button = Button(root, text="З\nчистого\nлиста", width=12, bg="black", fg="white",
+                          font=("Times New Roman", 12), command=himself_place_ship)
+    h_p_s_button.place(x=180, y=390)
+    check_button = Checkbutton(root, text="Відмічати \"холості клітинки\"", font=("Times New Roman", 12), onvalue=1,
+                               offvalue=0, variable=check_button_info)
+    check_button.place(x=1050, y=390)
+
+
+please_button_2x()
 
 
 def give_up():
     global get_all_loss_war, war_info_list
     giveUp = messagebox.askyesno("Здатися?", "Ви дійсно бажаєте здатися?")
     if giveUp:
+        stop_music_play()
         if authenticated:
             get_all_loss_war += 1
-            war_info_list.insert(0, f"Бій №{get_all_war} - Програно.")
+            war_info_list.insert(0, f"Бій №{get_all_war} ({get_time()}) - Програно.")
+        music_play_won_or_not()
         messagebox.showinfo("Поразка", "Ви програли")
         give_up_button.destroy()
         ship_var_pole.unbind("<Button-1>")
@@ -598,30 +727,55 @@ def give_up():
 
 
 def restart():
-    global coordinate_ship, coordinate_ship_2, won, rand_place_ship, count_rand_place_ship, occupied_cells, ship_place_pole, occupied_cells_2
-    coordinate_ship = []
-    coordinate_ship_2 = []
-    count_rand_place_ship = 0
+    global coordinate_ship, coordinate_ship_2, won, rand_place_ship, your_ship, opponent_ship, him_place_ship
+    rand_place_ship, him_place_ship, won = False, False, None
+    coordinate_ship, coordinate_ship_2, your_ship, opponent_ship = [], [], [], []
     war_button.destroy()
+    please_button_2x()
     ship_var_pole.configure(width=300)
-    rand_place_ship = None
-    won = None
     clear_pole()
 
 
-def place_button_to_root(event):
-    global war_button
-    war_button = Button(root, text="Розпочати\nБій", width=12, height=3, bg="black", fg="white",
-                        font=("Times New Roman", 12), command=get_ships_for_start_war)
-    war_button.place(x=600, y=390)
+def get_time():
+    uk_timezone = timezone("Europe/kiev")
+    current_time = datetime.datetime.now(uk_timezone)
+    time_str = current_time.strftime("%d.%m.%Y, %H:%M")
+    return time_str
 
 
-r_p_s_button.bind("<Button-1>", place_button_to_root)
-h_p_s_button.bind("<Button-1>", place_button_to_root)
+pygame.mixer.init()
 
 
-def get_true():
-    return
+def set_volume_music(volume):
+    pygame.mixer.music.set_volume(float(volume) / 100.0)
+
+
+volume_text = Label(root, text="Рівень гучності:", font=("Times New Roman", 12))
+volume_text.place(x=1050, y=432)
+volume_slider = Scale(root, from_=0, to=100, orient=HORIZONTAL, command=set_volume_music)
+volume_slider.place(x=1170, y=415)
+volume_slider.set(50)
+
+
+def music_play_won_or_not():
+    if won is True:
+        pygame.mixer.music.load("Sound/you_win.mp3")
+    else:
+        pygame.mixer.music.load("Sound/you_lost.mp3")
+    pygame.mixer.music.play(loops=0)
+
+
+def music_play():
+    rand = random.randint(0, 1)
+    if rand == 1:
+        pygame.mixer.music.load("Sound/war_game_1.mp3")
+    else:
+        pygame.mixer.music.load("Sound/war_game_2.mp3")
+    pygame.mixer.music.play(-1)
+
+
+def stop_music_play():
+    pygame.mixer.music.stop()
 
 
 def on_enter(event):
@@ -654,20 +808,11 @@ def show_info():
                                  "%D0%B3%D1%80%D0%B0)")
 
 
-def get_colour_dracula():
-    root.configure(bg="black")
-
-
-def get_color():
-    root.configure(bg="red")
-
-
 # ----------------------------------------------------------------------------------------------------------------------
-window_reg = None
-authenticated = False
+window_reg, authenticated = None, False
 
 
-def create_connection_to_mysql_db(db_host, user_name, user_password, db_name):
+def create_connection_to_mysql_db(db_host, user_name, user_password, port, db_name):
     global connection
     connection = None
     try:
@@ -675,6 +820,7 @@ def create_connection_to_mysql_db(db_host, user_name, user_password, db_name):
             host=db_host,
             user=user_name,
             password=user_password,
+            port=port,
             database=db_name
         )
         print("Connection to DB in method is good")
@@ -736,7 +882,8 @@ def window_for_registration(event=None):
             email_is_valid = validate_email(post__get, check_deliverability=True)
             print('Email is valid')
 
-            if password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post__get != '' and not window_reg_forgot:
+            if password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post__get != '' and \
+                    not window_reg_forgot:
                 if password_reg_rep_get != password_reg_get:
                     mistake.configure(text="Неправильний пароль!")
                     mistake.place(x=75, y=300)
@@ -748,7 +895,9 @@ def window_for_registration(event=None):
                         conn_reg = create_connection_to_mysql_db(db_config["mysql"]["host"],
                                                                  db_config["mysql"]["user"],
                                                                  db_config["mysql"]["pass"],
+                                                                 db_config["mysql"]["port"],
                                                                  "War_ship_game")
+
                         with conn_reg.cursor() as cursor_reg:
                             post_list = []
                             select_post_from_db = 'SELECT post FROM User_registration'
@@ -792,13 +941,15 @@ def window_for_registration(event=None):
                         cursor_reg.close()
                         conn_reg.close()
 
-            elif password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post__get != '' and window_reg_forgot:
+            elif password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post__get != '' and \
+                    window_reg_forgot:
                 mistake.configure(text="")
 
                 try:
                     conn_forgot_pass = create_connection_to_mysql_db(db_config["mysql"]["host"],
                                                                      db_config["mysql"]["user"],
                                                                      db_config["mysql"]["pass"],
+                                                                     db_config["mysql"]["port"],
                                                                      "War_ship_game")
                     with conn_forgot_pass.cursor() as cursor_forgot:
                         select_post_name_from_db = f'''SELECT post, name, id from User_registration 
@@ -898,6 +1049,7 @@ def window_for_login(event=None):
                 conn_log = create_connection_to_mysql_db(db_config["mysql"]["host"],
                                                          db_config["mysql"]["user"],
                                                          db_config["mysql"]["pass"],
+                                                         db_config["mysql"]["port"],
                                                          "War_ship_game")
 
                 with conn_log.cursor() as cursor_log:
@@ -1004,7 +1156,7 @@ def get_user_information(event):
     win_war_label.pack()
     loss_war_label = Label(window_user_info, font=("Times New Roman", 12))
     loss_war_label.pack()
-    info_war_text = Listbox(window_user_info, width=30, height=10, font=("Times New Roman", 12))
+    info_war_text = Listbox(window_user_info, width=40, height=10, font=("Times New Roman", 12))
     info_war_text.pack()
     button_leave_info = Button(window_user_info, text="Вийти з системи", bg="black", fg="white",
                                font=("Times New Roman", 12), command=leave_authenticated_info)
@@ -1016,7 +1168,9 @@ def get_user_information(event):
         get_info = create_connection_to_mysql_db(db_config["mysql"]["host"],
                                                  db_config["mysql"]["user"],
                                                  db_config["mysql"]["pass"],
+                                                 db_config["mysql"]["port"],
                                                  "War_ship_game")
+
         with get_info.cursor() as cursor_get_info:
             id_list = []
             select_id_from_db = 'SELECT id FROM User_info'
@@ -1056,6 +1210,7 @@ def get_user_information(event):
             get_user_info = create_connection_to_mysql_db(db_config["mysql"]["host"],
                                                           db_config["mysql"]["user"],
                                                           db_config["mysql"]["pass"],
+                                                          db_config["mysql"]["port"],
                                                           "War_ship_game")
             if get_all_war is None or get_all_loss_war is None or get_all_win_war is None or war_info_list == []:
                 with get_user_info.cursor() as cursor_get_user_info:
@@ -1092,6 +1247,7 @@ def get_user_information(event):
                     cursor_get_user_info.execute(update_user_war_info)
                     get_user_info.commit()
 
+                info_war_text.delete(0, END)
                 for elem in war_info_list:
                     info_war_text.insert(END, elem)
 
@@ -1140,11 +1296,6 @@ add_menu.add_command(label="Правила гри.", command=show_info)
 add_menu.add_command(label='Вхід в систему', command=window_for_login)
 main_menu.add_cascade(label='Меню', menu=add_menu)
 login_leave_index = add_menu.index("Вхід в систему")
-
-color_meny = Menu(main_menu, tearoff=0)
-color_meny.add_command(label='Dracula', command=get_colour_dracula)
-color_meny.add_command(label="wtf", command=get_color)
-main_menu.add_cascade(label="Тема", menu=color_meny)
 
 
 root.mainloop()
