@@ -1,14 +1,13 @@
+import json
 from tkinter import *
 from tkinter import messagebox
 from email_validator import validate_email, EmailNotValidError
 import webbrowser
 import random
-import mysql.connector
-from mysql.connector import Error
-from config import db_config
 from pytz import timezone
 import datetime
 import pygame
+import requests
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -29,6 +28,7 @@ window_registration = None
 window_user_info = None
 rand_place_ship = False
 him_place_ship = False
+get_id_from_post, get_all_war, get_all_win_war, get_all_loss_war, war_info_list = None, None, None, None, [i for i in range(0, 10)]
 list_with_line = []
 check_button_info = IntVar()
 
@@ -786,13 +786,17 @@ def on_leave(event):
     forgot_password_label.config(fg="black", cursor="arrow")
 
 
-# ----------------------------------------------------------------------------------------------------------------------
 def root_by():
     by = messagebox.askyesno("Вихід", "Видійсно бажаєте завершити гру?")
     if by:
-        root.quit()
+        if get_id_from_post is not None and get_all_war is not None and get_all_win_war is not None and get_all_loss_war is not None:
+            put_info_war_to_db()
+        root.destroy()
     else:
         pass
+
+
+root.protocol("WM_DELETE_WINDOW", root_by)
 
 
 def open_browser_to_get_info(url):
@@ -801,8 +805,8 @@ def open_browser_to_get_info(url):
 
 def show_info():
     message = "Перейти за посиланням?\nuk.wikipedia.org/wiki/Морський_бій_(настільна_гра)"
-    get_info = messagebox.askyesno("Правила гри", message)
-    if get_info:
+    get_info_rules = messagebox.askyesno("Правила гри", message)
+    if get_info_rules:
         open_browser_to_get_info("https://uk.wikipedia.org/wiki/%D0%9C%D0%BE%D1%80%D1%81%D1%8C%D0%BA%D0%B8%D0%B9_"
                                  "%D0%B1%D1%96%D0%B9_(%D0%BD%D0%B0%D1%81%D1%82%D1%96%D0%BB%D1%8C%D0%BD%D0%B0_"
                                  "%D0%B3%D1%80%D0%B0)")
@@ -810,29 +814,6 @@ def show_info():
 
 # ----------------------------------------------------------------------------------------------------------------------
 window_reg, authenticated = None, False
-
-
-def create_connection_to_mysql_db(db_host, user_name, user_password, port, db_name):
-    global connection
-    connection = None
-    try:
-        connection = mysql.connector.connect(
-            host=db_host,
-            user=user_name,
-            password=user_password,
-            port=port,
-            database=db_name
-        )
-        print("Connection to DB in method is good")
-    except Error as db_connection_error:
-        print("Error in db connection: ", db_connection_error)
-        if window_reg is True:
-            mistake.configure(text="Помилка з підєднанням\nдо бази даних!")
-            mistake.place(x=75, y=300)
-        else:
-            mistake_login.configure(text="Помилка з підєднанням\nдо бази даних!")
-            mistake_login.place(x=70, y=180)
-    return connection
 
 
 def window_for_registration(event=None):
@@ -889,101 +870,40 @@ def window_for_registration(event=None):
                     mistake.place(x=75, y=300)
                 else:
                     mistake.configure(text="")
-                    print("good")
+                    data_request = {"post": post__get, "name": name_get, "password": password_reg_get}
+                    data_json_request = json.dumps(data_request)
+                    response = requests.post("http://159.223.26.228:5000/registration", data=data_json_request).json()
+                    message = response["message"]
 
-                    try:
-                        conn_reg = create_connection_to_mysql_db(db_config["mysql"]["host"],
-                                                                 db_config["mysql"]["user"],
-                                                                 db_config["mysql"]["pass"],
-                                                                 db_config["mysql"]["port"],
-                                                                 "War_ship_game")
+                    if message == 'Registration successful':
+                        get_id_from_post = response["id"]
+                        get_ifo_from_post = response["info"]
+                        get_name_from_post = name_get
+                        authenticated = True
+                        get_all_war, get_all_win_war, get_all_loss_war, war_info_list = int(get_ifo_from_post[1]), int(get_ifo_from_post[2]), int(get_ifo_from_post[3]), get_ifo_from_post[4:14]
+                        authenticated_get_data(event=None)
+                    else:
+                        mistake_login.configure(text="Користувач з цією\nпоштою вже зареєстрований!")
+                        mistake_login.place(x=40, y=180)
 
-                        with conn_reg.cursor() as cursor_reg:
-                            post_list = []
-                            select_post_from_db = 'SELECT post FROM User_registration'
-                            cursor_reg.execute(select_post_from_db)
-                            get_post_db = cursor_reg.fetchall()
-                            for posts in get_post_db:
-                                post_list.append(posts[0])
-
-                        if post__get not in post_list:
-                            # print data to table
-                            with conn_reg.cursor() as cursor_reg:
-                                insert_data_registration = f'''
-                                                            INSERT INTO 
-                                                                `User_registration` (`post`, `name`, `password`)
-                                                            VALUES 
-                                                                 ('{post__get}', '{name_get}', '{password_reg_get}')
-                                                            '''
-                                cursor_reg.execute(insert_data_registration)
-                                conn_reg.commit()
-
-                            with conn_reg.cursor() as cursor_reg:
-                                get_id_registration = 'SELECT LAST_INSERT_ID()'
-                                cursor_reg.execute(get_id_registration)
-                                get_id_reg = cursor_reg.fetchone()
-                                get_id_from_post = get_id_reg[0]
-                                authenticated = True
-                                get_all_war, get_all_win_war, get_all_loss_war, war_info_list = None, None, None, None
-                                get_name_from_post = name_get
-                                authenticated_get_data(event=None)
-
-                        else:
-                            mistake.configure(text="Користувач з цією\nпоштою вже зареєстрований!")
-                            mistake.place(x=50, y=300)
-
-                    except Error as error:
-                        mistake.configure(text="Помилка з доступом\nдо бази даних!")
-                        mistake.place(x=80, y=300)
-                        print("Error: ", error)
-
-                    finally:
-                        cursor_reg.close()
-                        conn_reg.close()
 
             elif password_reg_get != '' and password_reg_rep_get != '' and name_get != '' and post__get != '' and \
                     window_reg_forgot:
                 mistake.configure(text="")
 
-                try:
-                    conn_forgot_pass = create_connection_to_mysql_db(db_config["mysql"]["host"],
-                                                                     db_config["mysql"]["user"],
-                                                                     db_config["mysql"]["pass"],
-                                                                     db_config["mysql"]["port"],
-                                                                     "War_ship_game")
-                    with conn_forgot_pass.cursor() as cursor_forgot:
-                        select_post_name_from_db = f'''SELECT post, name, id from User_registration 
-                                                        where post = '{post__get}' and name = '{name_get}' '''
-                        cursor_forgot.execute(select_post_name_from_db)
-                        get_post_name_db = cursor_forgot.fetchone()
-                        print(get_post_name_db)
+                data_request = {"post": post__get, "name": name_get, "password": password_reg_get}
+                data_json_request = json.dumps(data_request)
+                response = requests.post("http://159.223.26.228:5000/forgot_password", data=data_json_request).json()
+                message = response["message"]
 
-                        if get_post_name_db is None:
-                            mistake.configure(text="Неправильний email\nчи ім'я користувача")
-                            mistake.place(x=80, y=300)
-                        else:
-                            if password_reg_rep_get != password_reg_get:
-                                mistake.configure(text="Неправильний пароль!")
-                                mistake.place(x=75, y=300)
-                            else:
-                                with conn_forgot_pass.cursor() as cursor_forgot:
-                                    update_user_password_forgot = f'''UPDATE User_registration SET 
-                                                                      password = '{password_reg_get}' WHERE 
-                                                                      id = '{get_post_name_db[2]}' '''
-                                    cursor_forgot.execute(update_user_password_forgot)
-                                    conn_forgot_pass.commit()
-                                    print("nev password created")
-
-                                window_for_login()
-
-                except Error as error:
-                    mistake.configure(text="Помилка з доступом\nдо бази даних!")
+                if message == 'User with this email has`t been fond':
+                    mistake.configure(text="Неправильний email\nчи ім'я користувача")
                     mistake.place(x=80, y=300)
-                    print("Error: ", error)
-
-                finally:
-                    cursor_forgot.close()
-                    conn_forgot_pass.close()
+                elif password_reg_rep_get != password_reg_get:
+                    mistake.configure(text="Неправильний пароль!")
+                    mistake.place(x=75, y=300)
+                else:
+                    window_for_login()
 
             else:
                 mistake.configure(text="Заповніть всі поля!")
@@ -1010,7 +930,7 @@ def window_for_login(event=None):
     window_registration = Toplevel(root)
     window_registration.title("Вхід")
     window_registration.geometry("300x250+760+300")
-    window_registration.resizable(True, True)
+    window_registration.resizable(False, False)
 
     window_reg_forgot = False
 
@@ -1039,63 +959,30 @@ def window_for_login(event=None):
     registration_button.bind("<Button-1>", window_for_registration)
 
     def login(event):
-        global conn_log, cursor_log, authenticated, get_id_from_post, get_name_from_post, get_all_war, get_all_win_war, \
-               get_all_loss_war, war_info_list, post__get
+        global authenticated, get_id_from_post, get_name_from_post, get_all_war, get_all_win_war, get_all_loss_war, \
+               war_info_list, post__get
         post__get = get_post_login_entry.get()
         password_log_get = get_password_login_entry.get()
 
         if post__get != '' and password_log_get != '':
-            try:
-                conn_log = create_connection_to_mysql_db(db_config["mysql"]["host"],
-                                                         db_config["mysql"]["user"],
-                                                         db_config["mysql"]["pass"],
-                                                         db_config["mysql"]["port"],
-                                                         "War_ship_game")
+            data_request = {"post": post__get, "password": password_log_get}
+            data_json_request = json.dumps(data_request)
+            response = requests.post("http://159.223.26.228:5000/login", data=data_json_request).json()
+            message = response["message"]
 
-                with conn_log.cursor() as cursor_log:
-                    post_list = []
-                    select_post_from_db = 'SELECT post FROM User_registration'
-                    cursor_log.execute(select_post_from_db)
-                    get_post_db = cursor_log.fetchall()
-                    for posts in get_post_db:
-                        post_list.append(posts[0])
-
-                if post__get in post_list:
-                    with conn_log.cursor() as cursor_log:
-                        select_id_pass_for_post_from_db = f'''SELECT id, password, name
-                                                          from User_registration WHERE post = '{post__get}' '''
-                        cursor_log.execute(select_id_pass_for_post_from_db)
-                        get_id_pass_from_post = cursor_log.fetchone()
-                        get_pass_from_post = get_id_pass_from_post[1]
-
-                    if get_pass_from_post == password_log_get:
-                        get_id_from_post = get_id_pass_from_post[0]
-                        get_name_from_post = get_id_pass_from_post[2]
-                        authenticated = True
-                        get_all_war, get_all_win_war, get_all_loss_war, war_info_list = None, None, None, None
-                        authenticated_get_data(event=None)
-                        print(get_id_from_post)
-                    else:
-                        mistake_login.configure(text="Невірно введений пароль!")
-                        mistake_login.place(x=60, y=180)
-                else:
-                    mistake_login.configure(text="Користувача не знайдено!\nСпочатку треба зареєструватись.")
-                    mistake_login.place(x=40, y=180)
-
-            except Error as error:
-                mistake_login.configure(text="Помилка з доступом\nдо бази даних!")
-                mistake_login.place(x=80, y=180)
-                print("Error: ", error)
-            except AttributeError:
-                pass
-
-            finally:
-                if connection is not None:
-                    cursor_log.close()
-                    conn_log.close()
-                else:
-                    pass
-
+            if message == 'Login successful':
+                get_id_from_post = response["id"]
+                get_name_from_post = response["name"]
+                get_info_from_post = response["info"]
+                authenticated = True
+                get_all_war, get_all_win_war, get_all_loss_war, war_info_list = int(get_info_from_post[1]), int(get_info_from_post[2]), int(get_info_from_post[3]), get_info_from_post[4:14]
+                authenticated_get_data(event=None)
+            elif message == 'Password is wrong':
+                mistake_login.configure(text="Невірно введений пароль!")
+                mistake_login.place(x=60, y=180)
+            else:
+                mistake_login.configure(text="Користувача не знайдено!\nСпочатку треба зареєструватись.")
+                mistake_login.place(x=40, y=180)
         else:
             mistake_login.configure(text="Заповніть всі поля!")
             mistake_login.place(x=80, y=180)
@@ -1143,7 +1030,7 @@ def get_user_information(event):
     window_user_info = Toplevel(root)
     window_user_info.title(f"{get_name_from_post}")
     window_user_info.geometry("400x500+705+220")
-    window_user_info.resizable(True, True)
+    window_user_info.resizable(False, False)
 
     Label(window_user_info, text=f"Ім'я: {get_name_from_post}", font=("Times New Roman", 12)).pack()
     Label(window_user_info, text=f"Пошта: {post__get}", font=("Times New Roman", 12)).pack()
@@ -1164,106 +1051,27 @@ def get_user_information(event):
     mistake_info = Label(window_user_info, font=("Times New Roman", 12), foreground="red")
     mistake_info.pack()
 
-    try:
-        get_info = create_connection_to_mysql_db(db_config["mysql"]["host"],
-                                                 db_config["mysql"]["user"],
-                                                 db_config["mysql"]["pass"],
-                                                 db_config["mysql"]["port"],
-                                                 "War_ship_game")
-
-        with get_info.cursor() as cursor_get_info:
-            id_list = []
-            select_id_from_db = 'SELECT id FROM User_info'
-            cursor_get_info.execute(select_id_from_db)
-            get_id_db = cursor_get_info.fetchall()
-            for id in get_id_db:
-                id_list.append(id[0])
-
-        if get_id_from_post not in id_list:
-            with get_info.cursor() as cursor_get_info:
-                insert_data_info = f'''
-                                    INSERT INTO
-                                        `User_info` (`id`, `count`, `count_win`, `count_loos`, `col_10`, `col_9`, 
-                                                     `col_8`, `col_7`, `col_6`, `col_5`, `col_4`, `col_3`, `col_2`, 
-                                                     `col_1`)
-                                    VALUES
-                                        ('{get_id_from_post}', 0, 0, 0, 'N10', 'N9', 'N8', 'N7', 'N6', 
-                                        'N5', 'N4', 'N3', 'N2', 'N1')
-                                    '''
-                cursor_get_info.execute(insert_data_info)
-                get_info.commit()
-        else:
-            pass
-
-    except Error as error:
-        mistake_info.configure(text="Помилка з доступом\nдо бази даних!")
-        print("Error: ", error)
-
-    finally:
-        cursor_get_info.close()
-        get_info.close()
-
 
     def get_history_war(event):
-        global get_user_info, get_all_war, get_all_win_war, get_all_loss_war, war_info_list
-        try:
-            get_user_info = create_connection_to_mysql_db(db_config["mysql"]["host"],
-                                                          db_config["mysql"]["user"],
-                                                          db_config["mysql"]["pass"],
-                                                          db_config["mysql"]["port"],
-                                                          "War_ship_game")
-            if get_all_war is None or get_all_loss_war is None or get_all_win_war is None or war_info_list == []:
-                with get_user_info.cursor() as cursor_get_user_info:
-                    select_user_game_data_from_db = f'''SELECT * FROM User_info where id = '{get_id_from_post}' '''
-                    cursor_get_user_info.execute(select_user_game_data_from_db)
-                    get_data_db = cursor_get_user_info.fetchone()
+        global get_all_war, get_all_win_war, get_all_loss_war, war_info_list
+        info_war_text.delete(0, END)
+        for elem in war_info_list:
+            info_war_text.insert(END, elem)
 
-                war_info_list = []
-                get_all_war = int(get_data_db[1])
-                get_all_win_war = int(get_data_db[2])
-                get_all_loss_war = int(get_data_db[3])
-                co = 4
-                for war_info in range(4, 14):
-                    war_info_list.append(get_data_db[war_info])
-                    co += 1
+        all_war_label.configure(text=f"Кількість зіграних боїв: {get_all_war}")
+        win_war_label.configure(text=f"Кількість виграних боїв: {get_all_win_war}")
+        loss_war_label.configure(text=f"Кількість програних боїв: {get_all_loss_war}")
 
-            else:
-                with get_user_info.cursor() as cursor_get_user_info:
-                    update_user_war_info = f'''UPDATE User_info SET 
-                                                            count = '{get_all_war}',
-                                                            count_win = '{get_all_win_war}',
-                                                            count_loos = '{get_all_loss_war}',
-                                                            col_10 = '{war_info_list[0]}',
-                                                            col_9 = '{war_info_list[1]}',
-                                                            col_8 = '{war_info_list[2]}',
-                                                            col_7 = '{war_info_list[3]}',
-                                                            col_6 = '{war_info_list[4]}',
-                                                            col_5 = '{war_info_list[5]}',
-                                                            col_4 = '{war_info_list[6]}',
-                                                            col_3 = '{war_info_list[7]}',
-                                                            col_2 = '{war_info_list[8]}',
-                                                            col_1 = '{war_info_list[9]}'
-                                                        WHERE id = '{get_id_from_post}' '''
-                    cursor_get_user_info.execute(update_user_war_info)
-                    get_user_info.commit()
-
-                info_war_text.delete(0, END)
-                for elem in war_info_list:
-                    info_war_text.insert(END, elem)
-
-                all_war_label.configure(text=f"Кількість зіграних боїв: {get_all_war}")
-                win_war_label.configure(text=f"Кількість виграних боїв: {get_all_win_war}")
-                loss_war_label.configure(text=f"Кількість програних боїв: {get_all_loss_war}")
-
-        except Error as error:
-            mistake_info.configure(text="Помилка з доступом\nдо бази даних!")
-            print("Error: ", error)
-
-        finally:
-            cursor_get_user_info.close()
-            get_user_info.close()
+        put_info_war_to_db()
 
     get_history_button.bind("<Button-1>", get_history_war)
+
+
+def put_info_war_to_db():
+    data_request = {"id": get_id_from_post, "all_war": get_all_war, "win_war": get_all_win_war,
+                    "loss_war": get_all_loss_war, "war_info": war_info_list[0:10]}
+    data_json_request = json.dumps(data_request)
+    response = requests.post("http://159.223.26.228:5000/history", data=data_json_request).json()
 
 
 def leave_authenticated():
